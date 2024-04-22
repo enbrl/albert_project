@@ -5,12 +5,15 @@
 # Project Title
 
 ## Overview
-Briefly describe what the project does and its purpose. Include any unique features or problems it solves.
+This project is designed to automate the extraction of used car listings from [autohero.com](https://www.autohero.com) and to utilize machine learning for estimating car prices based on the gathered data. The primary objectives are to streamline the process of data collection and to deploy a predictive model that offers accurate price estimations for users looking to buy or sell used cars.
 
 ## Features
-- Feature 1: Describe the feature and its benefit.
-- Feature 2: Highlight another feature and why it's useful.
-- Feature 3: If applicable, describe another key aspect of the project.
+- **Data Scraping**: Automated scraping tool to collect detailed information on used car listings, such as model, year, price, mileage, and features. This data serves as the foundation for the predictive model.
+  
+- **Machine Learning Model**: Implementation of a regression model to estimate car prices based on historical data. This model is trained with features extracted from the scraped data, adjusted for accuracy and reliability over time.
+  
+- **Data Analysis Interface**: Provides tools for data visualization and analysis, helping users understand the factors that influence car prices and how they vary over different segments.
+
 
 ## Dataset
 Google Drive : https://drive.google.com/drive/u/0/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2?q=sharedwith:public%20parent:1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2
@@ -23,25 +26,6 @@ git clone https://github.com/username/projectname.git
 cd projectname
 pip install -r requirements.txt
 
-
-
-
-Voici un README formaté en Markdown que vous pouvez directement copier et coller sur GitHub pour votre projet de scraper de site de voitures d'occasion AutoHero :
-
-```markdown
-# AutoHero Used Car Scraper
-
-## Overview
-The AutoHero Used Car Scraper is designed to extract listings of used cars from the website [autohero.com](https://www.autohero.com). This tool automates the process of gathering data such as car models, prices, mileage, and other relevant information, which can be crucial for market analysis, price comparison, or personal use. The primary goal is to provide users with an efficient way to access large amounts of car data without manually browsing the website.
-
-## Features
-
-- **Automated Data Extraction**: Automatically scrapes and collects detailed information on used car listings, including model, year, price, mileage, and location. This feature saves users hours of manual data collection.
-- **Data Organization**: Organizes scraped data into a structured format (e.g., CSV, JSON), making it easy to analyze and utilize in various applications, such as spreadsheets or databases.
-- **Customizable Search Parameters**: Allows users to set specific parameters for the scraper, such as make, model, price range, and geographic area, enabling targeted data extraction.
-
-## Dataset
-Access the scraped data stored on Google Drive: [Scraped Data Folder](https://drive.google.com/drive/u/0/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2?q=sharedwith:public%20parent:1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2)
 
 ## Installation
 
