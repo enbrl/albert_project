@@ -20,4 +20,4 @@ Google Drive : https://drive.google.com/drive/u/0/folders/1hYUp5XBxwYOfoLZZuGwi5
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ## Contact
-For any inquiries or help with the setup, please [email us](mailto:adjouamai@albertschool.com).
+For any inquiries or help with the setup, please [email us](mailto:cpietri@albertschool.com).
