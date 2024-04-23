@@ -1,11 +1,7 @@
-
-* Creating a clear and informative README file is crucial for any project, as it often serves as the first point of reference for anyone who encounters your project repository.
-* Below is a template to start with: 
-
-# Project Title
+# Scraping Automobile
 
 ## Overview
-This project is designed to automate the extraction of used car listings from [autohero.com](https://www.autohero.com) and to utilize machine learning for estimating car prices based on the gathered data. The primary objectives are to streamline the process of data collection and to deploy a predictive model that offers accurate price estimations for users looking to buy or sell used cars.
+This project is designed to automate the extraction of used car listings from [aramisauto.com]([https://www.autohero.com](https://www.aramisauto.com/?cmpid=ps_ky_GOOGLE_VN_E_SEARCH_BRAND&gad_source=1&gclid=CjwKCAjwuJ2xBhA3EiwAMVjkVO7OkAQ1jXRUV3mpUSfQgGfxCJyhZQJI_C1CLUGHF-Gt_YhVOJ-jrxoCHxgQAvD_BwE)) and to utilize machine learning for estimating car prices based on the gathered data. The primary objectives are to streamline the process of data collection and to deploy a predictive model that offers accurate price estimations for users looking to buy or sell used cars.
 
 ## Features
 - **Data Scraping**: Automated scraping tool to collect detailed information on used car listings, such as model, year, price, mileage, and features. This data serves as the foundation for the predictive model.
