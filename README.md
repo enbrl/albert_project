@@ -14,37 +14,8 @@ This project is designed to automate the extraction of used car listings from [a
 ## Dataset
 Google Drive : https://drive.google.com/drive/u/0/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2?q=sharedwith:public%20parent:1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2
 
-## Installation
-Provide step-by-step instructions on how to get a development environment running.
-
-```bash
-git clone https://github.com/username/projectname.git
-cd projectname
-pip install -r requirements.txt
-
-
-## Installation
-
-To set up your development environment, follow these steps:
-
-```bash
-git clone https://github.com/username/autohero-scraper.git
-cd autohero-scraper
-pip install -r requirements.txt
-```
-
-## Usage
-
-After installation, you can run the scraper using the following command:
-
-```bash
-python scraper.py
-```
-
 Make sure to modify the search parameters in the script as needed to tailor the scraper to your specific requirements.
 
-## Contributing
-Contributions are welcome! For major changes, please open an issue first to discuss what you would like to change. Please make sure to update tests as appropriate.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
