@@ -14,17 +14,10 @@ This project is designed to automate the extraction of used car listings from [a
 ## Dataset
 Google Drive : https://drive.google.com/drive/u/0/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2?q=sharedwith:public%20parent:1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2
 
-Make sure to modify the search parameters in the script as needed to tailor the scraper to your specific requirements.
 
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ## Contact
-For any inquiries or help with the setup, please [email us](mailto:support@autoheroscraper.com).
-
-## Additional Notes
-Please ensure you comply with autohero.com's terms of service when using this scraper. Use responsibly and ethically.
-```
-
-Assurez-vous de remplacer les liens et les références de l'utilisateur GitHub (`username`) par vos informations spécifiques avant de publier le README dans votre dépôt.
+For any inquiries or help with the setup, please [email us](mailto:adjouamai@albertschool.com).
