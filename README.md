@@ -12,7 +12,7 @@ This project is designed to automate the extraction of used car listings from [a
 
 
 ## Dataset
-Google Drive : https://drive.google.com/drive/u/0/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2?q=sharedwith:public%20parent:1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2
+Google Drive : https://drive.google.com/drive/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o5-y4Zo2?usp=sharing
 
 
 
