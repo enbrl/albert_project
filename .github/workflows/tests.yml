@@ -35,7 +35,8 @@ jobs:
 
   # The oldest packages that requirements.txt allows (constraints-min.txt), with Python 3.9
   oldest:
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest: GitHub does not provide Python 3.9 on its newest Ubuntu (26.04), only up to 24.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
