@@ -1,83 +1,74 @@
 # Model card: used-car price estimate
 
 What the price model is, what it was trained on, how wrong it is and where, and what it must not be used for.
-The figures below were **measured on 2026-11-07** on the data scraped that day; the commands at the end reproduce them.
+This card is written by `python -m scripts.model_card` from the data scraped on **2026-11-07**: every number is measured, none is typed by hand. Run it again after a new scraping.
 
 ## Summary
 
-The model estimates the **asking price of a used car** from its brand and model, fuel, gearbox, mileage, year and (when it
-is written in the listing) power, trim and, for an electric car, battery capacity. It was trained on the **2693 cars of the whole aramisauto.com used-car listing**.
-Measured on cars it had not seen (5-fold cross-validation), it is wrong by **1 256 € on average, 6.4 % of the
-price**. Always answering the average price would be wrong by 5 193 € (30.8 %). It is a **learning project**, not a valuation tool.
+The model (boosting) estimates the **asking price of a used car** from its brand, model, fuel, gearbox, mileage, year, power, battery, family of the trim. It was trained on **2 693 cars of the aramisauto.com used-car listing**. Measured on cars it had not seen (5-fold cross-validation), it is wrong by **1 256 € on average, 6.4 % of the price**.
+Always answering the average price would be wrong by 5 193 € (30.8 %).
+It is a **learning project**, not a valuation tool.
 
 ## Intended use
 
 - Showing the whole data-science chain on a real listing: scraping, cleaning, modelling, evaluation.
-- Getting an order of magnitude for a **common** car of the listing (a Peugeot 208, a Renault Clio...), next to the real
-  cars of the data that look like it (the web application shows the five closest).
+- Getting an order of magnitude for a **common** car of the listing (a Peugeot 208, a Renault Clio...), next to
+  the real cars of the data that look like it (the web application shows the five closest).
 
-**Not intended for**: buying or selling decisions, insurance, taxes or any valuation that somebody relies on; cars that
-are not sold by this website; models that are rare in the data (see the limits); any use that treats the estimate as a
-price somebody will pay.
+**Not intended for**: buying or selling decisions, insurance, taxes or any valuation that somebody relies on; cars
+that are not sold by this website; models that are rare in the data (see the limits); any use that treats the
+estimate as a price somebody will pay.
 
 ## Data
 
 | | |
 |---|---|
 | Source | the public used-car listing of aramisauto.com (`/voitures/occasion/`), a reconditioned-car dealer |
-| Collected | 2026-11-07, all 113 pages, one request every 5 seconds (the `Crawl-delay` of its `robots.txt`) |
-| Size | 2693 cars, 38 brands, 302 models; asking prices from 5 999 € to 69 999 € (median 18 499 €); years 2010 to 2026 |
-| Fuel | petrol 1 069, hybrid 675, diesel 461, electric 271, plug-in hybrid 196, LPG 19, ethanol 2 |
-| Columns | `Id`, `Nom`, `Carburant`, `Boite de vitesse`, `Km`, `année`, `Prix`, `Motorisation`, `Finition`, `Puissance`, `Batterie` |
+| Collected | 2026-11-07, one request every 5 seconds (the `Crawl-delay` of its `robots.txt`) |
+| Size | 2 693 cars, 38 brands, 302 models; asking prices from 5 999 € to 69 999 € (median 18 499 €); years 2010 to 2026 |
+| Fuel | petrol 1 069, hybrid 675, diesel 461, electric 271, plug-in hybrid 196, LPG 19, ethanol E85 2 |
+| Columns | `Id`, `Nom`, `Carburant`, `Boite de vitesse`, `Km`, `année`, `Prix`, `Motorisation`, `Finition`, `Puissance`, `Batterie`, `Marque` |
 | Power | found in the text of the engine for 97.8 % of the cars (for the others it is empty and the model uses the median) |
 | Trim | written for 98.1 % of the cars (790 trims); the model uses its first word, the family (`Allure Pack` -> `allure`: 240 families) |
-| Battery | the capacity in kWh, found in the text of the engine for 210 of the 271 electric cars (`50 kWh - 136`); two typos of plug-in hybrids (`180 kWh`, `220 kWh`) are emptied |
+| Battery | the capacity in kWh, found in the text of the engine for 210 of the 271 electric cars (`50 kWh - 136`); a value outside 5 to 150 kWh is a typo and is emptied |
 
-The CSV files are **not** in the repository (`.gitignore`). No personal data is collected: a listing has a number, a model and a price.
-Read the terms of use of the website before publishing the data.
+The CSV files are **not** in the repository (`.gitignore`). No personal data is collected: a listing has a number,
+a model and a price. Read the terms of use of the website before publishing the data.
 
 ## Model
 
-- **Features**: brand, model, fuel, gearbox, mileage, year, power, family of the trim, battery capacity (empty for the
-  cars that are not electric: the model is told that it is missing). The condition of the car, its options and its colour
-  are not in the listing page, so they are not used.
-- **Target**: the asking price. The linear model and the boosting learn the **logarithm** of the price, so that a mistake of
-  10 % counts the same on a cheap car and on an expensive one.
-- **Choice**: three models are compared on the same 5 parts and the best is kept (`python -m scripts.models`):
+- **Features**: brand, model, fuel, gearbox, mileage, year, power, battery, family of the trim. The condition of the car, its options and its colour are not in the listing
+  page, so they are not used.
+- **Target**: the asking price. The linear model and the boosting learn the **logarithm** of the price, so that a
+  mistake of 10 % counts the same on a cheap car and on an expensive one.
+- **Choice**: the models are compared on the same 5 parts of the cars (`python -m scripts.models --compare`):
 
 | Model | Mean error | % of the price | R² |
 |---|---:|---:|---:|
-| **boosting** (gradient boosting, kept) | **1 256 €** | 6.4 % | 0.91 |
+| **boosting (gradient boosting), kept** | **1 256 €** | 6.4 % | 0.91 |
 | ridge (linear) | 1 321 € | 6.6 % | 0.88 |
 | random forest | 1 561 € | 8.0 % | 0.86 |
 | always the average price | 5 193 € | 30.8 % | 0.00 |
 
-The boosting is told which columns are labels: brand, fuel and gearbox are categories, and the model (287 names, more
-than the 255 categories it accepts) is replaced by its mean price. Before, it read them as numbers in alphabetical order
-(Audi=1 < BMW=2...), an order that means nothing for the price.
+The boosting reads brand, fuel and gearbox as categories; the model of the car (302 names, too many categories for it) is replaced by its mean price.
 
-- **What matters most** (how much the error grows when a column is shuffled): power 1 385 €, year 1 351 €, mileage 1 079 €,
-  model 1 063 €, brand 999 €, fuel 374 €, gearbox 307 €, family of the trim 227 €, battery 12 €. Only the electric cars
-  have a battery, and on them it no longer changes the error on average over 4 cuts of the data (1 579 € with or without
-  it): the power, now read for more cars, says the same thing.
+- **What matters most** (how much the error grows when a column is shuffled): power 1 385 €, year 1 351 €, mileage 1 079 €, model 1 063 €, brand 999 €, fuel 374 €, gearbox 307 €, family of the trim 227 €, battery 12 €.
 
 ## Where the model is wrong
 
-Cross-validation, the cars cut in groups (`python -m scripts.evaluate`). **Bias** is the mean of (estimate - real price):
-negative means the model estimates too low. Groups of fewer than 5 cars are left out.
+Cross-validation, the cars cut in groups (`python -m scripts.evaluate`). **Bias** is the mean of (estimate - real
+price): negative means the model estimates too low. Groups of fewer than 5 cars are left out.
 
-**By how well the data knows the model**, the clearest weakness:
+**By how well the data knows the model**:
 
 | Model | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
 | rare model (under 5 cars) | 339 | 2 697 € | 12.0 % | -750 € |
 | common model (5+ cars) | 2 354 | 1 048 € | 5.6 % | -42 € |
 
-A model with fewer than 5 cars in the data is estimated with an error **2.6 times larger**, and too low by 750 €
-on average: the model has hardly seen it, so it can only lean on the brand, the year and the mileage. 339 cars of the
-data are in this case.
+A model with fewer than 5 cars in the data is estimated with an error **2.6 times** that of a common model, and too low by 750 € on average: the model has hardly seen it, so it leans on the brand, the year and the mileage. 339 cars of the data are in this case.
 
-**By price**: the model is pulled towards the middle.
+**By price**:
 
 | Price | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
@@ -86,10 +77,8 @@ data are in this case.
 | third quarter | 673 | 1 112 € | 5.4 % | +24 € |
 | most expensive quarter | 673 | 2 170 € | 7.2 % | -921 € |
 
-The most expensive quarter is estimated too low by 921 € on average, the cheapest quarter too high. The worst single
-errors are premium cars (a Volvo EX90 at 69 999 € estimated near 41 100 €, a Mercedes Classe V at 40 999 € near 20 700 €,
-a Volvo V90 at 34 499 € near 15 500 €). A Citroën AMI at 7 999 € is estimated near 18 500 €: a licence-free quadricycle
-of 8 hp, the only one of the data, so the model has nothing like it to learn from.
+The most expensive quarter is estimated too low by 921 € on average, the cheapest quarter too high by 340 €.
+The worst single errors: a Volvo Ex90 at 69 999 € estimated near 41 100 €; a Mercedes Classe V at 40 999 € estimated near 20 700 €; a Volvo V90 at 34 499 € estimated near 15 500 €.
 
 **By fuel**:
 
@@ -122,8 +111,7 @@ of 8 hp, the only one of the data, so the model has nothing like it to learn fro
 | Peugeot | 660 | 921 € | 5.5 % | -60 € |
 | Citroën | 324 | 854 € | 5.4 % | +24 € |
 
-**By age and by mileage** (no strong pattern, between 5 % and 10 %; the oldest cars and those with the most kilometres are
-the least well estimated):
+**By age and by mileage**:
 
 | Age | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
@@ -143,26 +131,21 @@ the least well estimated):
 ## Limits and risks
 
 - **Asking price, not sale price.** The data is what the dealer asks, not what a buyer pays.
-- **One seller, one day.** All the cars come from one reconditioned-car dealer on 2026-11-07. Other sellers or other months
-  can have other prices; the model does not know that prices move with time.
-- **No condition, options or colour.** Two cars of the same model, year and mileage can have different prices for reasons
-  the model cannot see.
-- **Rare models and premium cars** are the weak points (tables above). A tool that shows an estimate should also show how
-  many similar cars the data holds (the web application does).
-- **Powers that cannot be read**: 60 cars (2.2 %) have no power in the text of their engine (Tesla `75 kWh - RWD`, Aion
-  `PREMIUM`...), and the Renault Zoé write an approximate one (`R110` for 108 hp) that is not read. The model uses the
-  median for them. The Toyota hybrids (`116h`) had no power before the power parser read the 'h' (69 cars).
-- **Small groups are noisy**: a group of 20 cars (LPG, Alfa Romeo...) gives an error that moves a lot from one scraping to
-  the next. Do not read more into them than they say.
+- **One seller, one day.** All the cars come from one reconditioned-car dealer on 2026-11-07. Other sellers or
+  other months can have other prices; the model does not know that prices move with time.
+- **No condition, options or colour.** Two cars of the same model, year and mileage can have different prices for
+  reasons the model cannot see.
+- **Rare models** are a weak point (tables above). A tool that shows an estimate should also show how many similar
+  cars the data holds (the web application does).
+- **Powers that cannot be read**: 60 cars (2.2 %) have no power in the text of their engine; the model uses the median for them.
+- **Small groups are noisy**: a group of 20 cars gives an error that moves a lot from one scraping to the next. Do
+  not read more into them than they say.
 
 ## Reproduce
 
 ```bash
-python -m scripts.pipeline --all                  # scrape (about 10 minutes), clean, report, train
-python -m scripts.evaluate data/cars_clean.csv    # the tables of "Where the model is wrong"
-python -m scripts.models data/cars_clean.csv --compare
+python -m scripts.pipeline --all                     # scrape (about 10 minutes), clean, report, train
+python -m scripts.model_card data/cars_clean.csv --scraped 2026-11-07   # this card
 ```
 
-Another scraping gives other cars and other numbers: the figures of this card are those of **2026-11-07**. Measured with
-Python 3.13, scikit-learn 1.9.1, pandas 3.1.1 and numpy 2.5.4 (`python -m scripts.models --info` shows the versions a
-saved model was made with).
+Another scraping gives other cars and other numbers. Measured with Python 3.13.5, scikit-learn 1.9.1, pandas 3.1.1 and numpy 2.5.4.

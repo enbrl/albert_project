@@ -147,15 +147,19 @@ def errors_by_model_rarity(cars, estimates, min_cars=MIN_CARS):
     return errors_by_group(labelled, estimates, 'model_rarity', min_cars=1)
 
 
-def evaluate(df, kind=DEFAULT_KIND, n_splits=5, random_state=42, min_cars=MIN_CARS):
+def evaluate(df, kind=DEFAULT_KIND, n_splits=5, random_state=42, min_cars=MIN_CARS, estimates=None):
     """
     The error of the model overall and for every group of cars.
+
+    Parameters:
+    - estimates: the out-of-fold estimates if they are already made (predict_out_of_fold), else they are made here
 
     Returns:
     - A dictionary: 'overall' (cars, mae, mape, bias), and one DataFrame per segment: 'fuel', 'age', 'price',
       'mileage', 'brand', 'model_rarity'
     """
-    estimates = predict_out_of_fold(df, kind, n_splits, random_state)
+    if estimates is None:
+        estimates = predict_out_of_fold(df, kind, n_splits, random_state)
     cars = add_segments(df)
     error = estimates - df['Prix']
     result = {
