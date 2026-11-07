@@ -1,4 +1,5 @@
 """Tests of scripts/estimator.py (what the web application needs, without Streamlit)."""
+
 import json
 
 import pandas as pd
@@ -31,6 +32,7 @@ def model(cars):
 
 # ---------------------------------------------------------------- the file of cars
 
+
 def test_load_cars(cars, tmp_path):
     path = tmp_path / 'cars.csv'
     cars.to_csv(path, index=False)
@@ -53,6 +55,7 @@ def test_load_cars_of_nothing(tmp_path):
 
 # ---------------------------------------------------------------- choices
 
+
 def test_model_names_are_sorted_and_unique(cars):
     assert model_names(cars) == ['Opel Astra', 'Peugeot 208', 'Peugeot 3008', 'Renault Clio']
     assert model_names(None) == []
@@ -65,6 +68,7 @@ def test_fuel_options(cars):
 
 
 # ---------------------------------------------------------------- similar cars
+
 
 def test_similar_cars_have_the_same_name_and_are_the_closest_first(cars):
     result = similar_cars(cars, 'Peugeot 208', 2019, 60_000, count=5)
@@ -88,21 +92,35 @@ def test_similar_cars_without_match():
 
 
 def test_similar_cars_fewer_than_asked():
-    two = pd.DataFrame({'Nom': ['Peugeot 208'] * 2, 'Carburant': ['Essence'] * 2, 'Boite de vitesse': ['Manuelle'] * 2,
-                        'Km': [1000, 2000], 'année': [2020, 2021], 'Prix': [9000, 9500]})
+    two = pd.DataFrame(
+        {
+            'Nom': ['Peugeot 208'] * 2,
+            'Carburant': ['Essence'] * 2,
+            'Boite de vitesse': ['Manuelle'] * 2,
+            'Km': [1000, 2000],
+            'année': [2020, 2021],
+            'Prix': [9000, 9500],
+        }
+    )
     assert len(similar_cars(two, 'Peugeot 208', 2020, 1000, count=5)) == 2
 
 
 def test_market_summary(cars):
     summary = market_summary(cars, 'peugeot 208')
     same = cars[cars['Nom'] == 'Peugeot 208']['Prix']
-    assert summary == {'cars': len(same), 'min': int(same.min()), 'median': float(same.median()), 'max': int(same.max())}
+    assert summary == {
+        'cars': len(same),
+        'min': int(same.min()),
+        'median': float(same.median()),
+        'max': int(same.max()),
+    }
     assert market_summary(cars, 'Ferrari F40') is None
     assert market_summary(cars, '') is None
     assert market_summary(None, 'Peugeot 208') is None
 
 
 # ---------------------------------------------------------------- the estimate
+
 
 def test_estimate_cleans_the_labels(model):
     clean = estimate(model, 'Peugeot 208', 'Diesel', 'Automatique', 60_000, 2019)
@@ -122,6 +140,7 @@ def test_estimate_uses_the_power_when_the_model_knows_it():
 
 
 # ---------------------------------------------------------------- the error of the model
+
 
 def test_typical_error(model, tmp_path):
     path = str(tmp_path / 'price.joblib')

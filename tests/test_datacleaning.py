@@ -1,4 +1,5 @@
 """Tests of scripts/datacleaning.py."""
+
 import pandas as pd
 import pytest
 
@@ -48,41 +49,49 @@ def test_normalize_name():
     assert normalize_name(None) is None
 
 
-@pytest.mark.parametrize('raw, expected', [
-    ('Essence', 'Essence'),
-    ('Diesel', 'Diesel'),
-    ('Électrique', 'Électrique'),
-    ('electrique', 'Électrique'),
-    ('Hybride essence', 'Hybride'),
-    ('Mild Hybrid Essence', 'Hybride'),
-    ('Hybride rechargeable essence', 'Hybride rechargeable'),
-    ('GPL', 'GPL'),
-    (None, UNKNOWN),
-    ('', UNKNOWN),
-])
+@pytest.mark.parametrize(
+    'raw, expected',
+    [
+        ('Essence', 'Essence'),
+        ('Diesel', 'Diesel'),
+        ('Électrique', 'Électrique'),
+        ('electrique', 'Électrique'),
+        ('Hybride essence', 'Hybride'),
+        ('Mild Hybrid Essence', 'Hybride'),
+        ('Hybride rechargeable essence', 'Hybride rechargeable'),
+        ('GPL', 'GPL'),
+        (None, UNKNOWN),
+        ('', UNKNOWN),
+    ],
+)
 def test_normalize_fuel(raw, expected):
     assert normalize_fuel(raw) == expected
 
 
-@pytest.mark.parametrize('raw, expected', [
-    ('Manuelle', 'Manuelle'),
-    ('Automatique', 'Automatique'),
-    ('Auto.', 'Automatique'),
-    ('Double embrayage / DCT', 'Automatique'),
-    (None, UNKNOWN),
-    ('???', UNKNOWN),
-])
+@pytest.mark.parametrize(
+    'raw, expected',
+    [
+        ('Manuelle', 'Manuelle'),
+        ('Automatique', 'Automatique'),
+        ('Auto.', 'Automatique'),
+        ('Double embrayage / DCT', 'Automatique'),
+        (None, UNKNOWN),
+        ('???', UNKNOWN),
+    ],
+)
 def test_normalize_gearbox(raw, expected):
     assert normalize_gearbox(raw) == expected
 
 
 def test_clean_cars_harmonises_the_messy_rows_of_the_notebooks():
     # Rows copied from the outputs of the notebooks: numbers and labels in different formats
-    df = make_df([
-        ['OPEL Astra', 'Essence', 'Manuelle', 19160, '2022', 19999],
-        ['Citroen C4', 'Diesel', 'Automatique', '57 844 km', '2021', '18 690 €'],
-        ['Renault Captur', 'Diesel', 'Double embrayage / DCT', '104 582 km', 2016, '11 690 €'],
-    ])
+    df = make_df(
+        [
+            ['OPEL Astra', 'Essence', 'Manuelle', 19160, '2022', 19999],
+            ['Citroen C4', 'Diesel', 'Automatique', '57 844 km', '2021', '18 690 €'],
+            ['Renault Captur', 'Diesel', 'Double embrayage / DCT', '104 582 km', 2016, '11 690 €'],
+        ]
+    )
     cleaned = clean_cars(df, current_year=2026)
     assert len(cleaned) == 3
     assert list(cleaned['Km']) == [19160, 57844, 104582]
@@ -96,20 +105,24 @@ def test_clean_cars_harmonises_the_messy_rows_of_the_notebooks():
 
 
 def test_clean_cars_removes_duplicates_after_harmonisation():
-    df = make_df([
-        ['PEUGEOT 308', 'Essence', 'Manuelle', 79049, 2019, 16999],
-        ['Peugeot 308', 'Essence', 'Manuelle', '79 049 km', '2019', '16 999 €'],
-    ])
+    df = make_df(
+        [
+            ['PEUGEOT 308', 'Essence', 'Manuelle', 79049, 2019, 16999],
+            ['Peugeot 308', 'Essence', 'Manuelle', '79 049 km', '2019', '16 999 €'],
+        ]
+    )
     assert len(clean_cars(df, current_year=2026)) == 1
 
 
 def test_clean_cars_keeps_one_row_per_id():
-    df = make_df([
-        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
-        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 9900],  # same car, the price changed
-        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],
-        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],  # no Id: only exact copies are removed
-    ])
+    df = make_df(
+        [
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 9900],  # same car, the price changed
+            ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],
+            ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],  # no Id: only exact copies are removed
+        ]
+    )
     df.insert(0, 'Id', [1036829, 1036829, None, None])
     cleaned = clean_cars(df, current_year=2026)
     assert len(cleaned) == 2
@@ -123,12 +136,14 @@ def test_clean_cars_without_id_column_has_no_id_column():
 
 
 def test_clean_cars_cleans_the_engine_columns_when_present():
-    df = make_df([
-        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
-        ['Peugeot 208', 'Essence', 'Manuelle', 51000, 2019, 10100],
-        ['Peugeot 208', 'Essence', 'Manuelle', 52000, 2019, 10200],
-        ['Peugeot 208', 'Essence', 'Manuelle', 53000, 2019, 10300],
-    ])
+    df = make_df(
+        [
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
+            ['Peugeot 208', 'Essence', 'Manuelle', 51000, 2019, 10100],
+            ['Peugeot 208', 'Essence', 'Manuelle', 52000, 2019, 10200],
+            ['Peugeot 208', 'Essence', 'Manuelle', 53000, 2019, 10300],
+        ]
+    )
     df['Motorisation'] = ['  1.2   PureTech 68 ', '', None, '50 kWh - 136']
     df['Finition'] = ['Like', 'GT  Line', None, ' ']
     df['Puissance'] = [68, '110 ch', 5, 99999]  # 5 and 99999 are not possible powers
@@ -156,16 +171,18 @@ def test_normalize_text():
 
 
 def test_clean_cars_removes_incomplete_and_impossible_rows():
-    df = make_df([
-        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],  # valid
-        [None, 'Essence', 'Manuelle', 50000, 2019, 10000],  # no name
-        ['Peugeot 208', 'Essence', 'Manuelle', None, 2019, 10100],  # no mileage
-        ['Peugeot 208', 'Essence', 'Manuelle', 50001, 2019, None],  # no price
-        ['Peugeot 208', 'Essence', 'Manuelle', 50002, 2019, 0],  # price 0
-        ['Peugeot 208', 'Essence', 'Manuelle', 50003, 1850, 10200],  # year too old
-        ['Peugeot 208', 'Essence', 'Manuelle', 50004, 2040, 10300],  # year in the future
-        ['Peugeot 208', 'Essence', 'Manuelle', 9999999, 2019, 10400],  # impossible mileage
-    ])
+    df = make_df(
+        [
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],  # valid
+            [None, 'Essence', 'Manuelle', 50000, 2019, 10000],  # no name
+            ['Peugeot 208', 'Essence', 'Manuelle', None, 2019, 10100],  # no mileage
+            ['Peugeot 208', 'Essence', 'Manuelle', 50001, 2019, None],  # no price
+            ['Peugeot 208', 'Essence', 'Manuelle', 50002, 2019, 0],  # price 0
+            ['Peugeot 208', 'Essence', 'Manuelle', 50003, 1850, 10200],  # year too old
+            ['Peugeot 208', 'Essence', 'Manuelle', 50004, 2040, 10300],  # year in the future
+            ['Peugeot 208', 'Essence', 'Manuelle', 9999999, 2019, 10400],  # impossible mileage
+        ]
+    )
     cleaned = clean_cars(df, current_year=2026)
     assert len(cleaned) == 1
     assert cleaned.loc[0, 'Prix'] == 10000
@@ -194,10 +211,12 @@ def test_main_merges_files_and_creates_the_output_folder(tmp_path):
     first = tmp_path / 'first.csv'
     second = tmp_path / 'second.csv'
     make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000]]).to_csv(first, index=False)
-    make_df([
-        ['PEUGEOT 208', 'Essence', 'Manuelle', '50 000 km', '2019', '10 000 €'],  # same car as the first file
-        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],
-    ]).to_csv(second, index=False)
+    make_df(
+        [
+            ['PEUGEOT 208', 'Essence', 'Manuelle', '50 000 km', '2019', '10 000 €'],  # same car as the first file
+            ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],
+        ]
+    ).to_csv(second, index=False)
 
     destination = tmp_path / 'data' / 'clean.csv'  # 'data' does not exist yet
     cleaned = main([str(first), str(second), '-o', str(destination)])
@@ -210,40 +229,47 @@ def test_main_merges_files_and_creates_the_output_folder(tmp_path):
 
 # ---------------------------------------------------------------- brands
 
+
 def test_without_accents():
     assert without_accents('Citroën') == 'Citroen'
     assert without_accents('Škoda Électrique') == 'Skoda Electrique'
     assert without_accents('Peugeot 208') == 'Peugeot 208'
 
 
-@pytest.mark.parametrize('name, expected', [
-    ('Alfa Romeo Tonale', ('Alfa Romeo', 'Tonale')),
-    ('Land Rover Defender 110', ('Land Rover', 'Defender 110')),
-    ('Aston Martin Vantage', ('Aston Martin', 'Vantage')),
-    ('Rolls Royce Ghost', ('Rolls-Royce', 'Ghost')),
-    ('Mercedes-Benz GLA', ('Mercedes', 'GLA')),
-    ('Mercedes Benz Classe A', ('Mercedes', 'Classe A')),
-    ('Mercedes Classe A', ('Mercedes', 'Classe A')),
-    ('Lynk&co 01', ('Lynk & Co', '01')),
-    ('Lynk & Co 01', ('Lynk & Co', '01')),
-    ('Citroen C4', ('Citroën', 'C4')),
-    ('Citroën C4', ('Citroën', 'C4')),
-    ('Peugeot 208', ('Peugeot', '208')),  # by default the brand is the first word
-    ('MG ZS', ('MG', 'ZS')),
-    ('Tesla', ('Tesla', '')),
-    ('', ('', '')),
-])
+@pytest.mark.parametrize(
+    'name, expected',
+    [
+        ('Alfa Romeo Tonale', ('Alfa Romeo', 'Tonale')),
+        ('Land Rover Defender 110', ('Land Rover', 'Defender 110')),
+        ('Aston Martin Vantage', ('Aston Martin', 'Vantage')),
+        ('Rolls Royce Ghost', ('Rolls-Royce', 'Ghost')),
+        ('Mercedes-Benz GLA', ('Mercedes', 'GLA')),
+        ('Mercedes Benz Classe A', ('Mercedes', 'Classe A')),
+        ('Mercedes Classe A', ('Mercedes', 'Classe A')),
+        ('Lynk&co 01', ('Lynk & Co', '01')),
+        ('Lynk & Co 01', ('Lynk & Co', '01')),
+        ('Citroen C4', ('Citroën', 'C4')),
+        ('Citroën C4', ('Citroën', 'C4')),
+        ('Peugeot 208', ('Peugeot', '208')),  # by default the brand is the first word
+        ('MG ZS', ('MG', 'ZS')),
+        ('Tesla', ('Tesla', '')),
+        ('', ('', '')),
+    ],
+)
 def test_split_brand(name, expected):
     assert split_brand(name) == expected
 
 
-@pytest.mark.parametrize('raw, expected', [
-    ('ALFA ROMEO GIULIA', 'Alfa Romeo Giulia'),
-    ('citroen c3', 'Citroën C3'),
-    ('CITROËN C3', 'Citroën C3'),
-    ('Mercedes-Benz GLA', 'Mercedes GLA'),
-    ('lynk&co 01', 'Lynk & Co 01'),
-])
+@pytest.mark.parametrize(
+    'raw, expected',
+    [
+        ('ALFA ROMEO GIULIA', 'Alfa Romeo Giulia'),
+        ('citroen c3', 'Citroën C3'),
+        ('CITROËN C3', 'Citroën C3'),
+        ('Mercedes-Benz GLA', 'Mercedes GLA'),
+        ('lynk&co 01', 'Lynk & Co 01'),
+    ],
+)
 def test_normalize_name_writes_the_brand_in_one_way(raw, expected):
     assert normalize_name(raw) == expected
 
@@ -257,8 +283,12 @@ def test_clean_cars_brand_of_a_two_word_brand():
 
 def test_clean_cars_merges_a_legacy_file_with_the_website_spelling():
     legacy = make_df([['Citroen C4', 'Diesel', 'Manuelle', '57 844 km', '2021', '18 690 €']])
-    website = make_df([['Citroën C4', 'Diesel', 'Manuelle', 57844, 2021, 18690],  # the same car
-                       ['Citroën C3', 'Essence', 'Manuelle', 30000, 2022, 14000]])
+    website = make_df(
+        [
+            ['Citroën C4', 'Diesel', 'Manuelle', 57844, 2021, 18690],  # the same car
+            ['Citroën C3', 'Essence', 'Manuelle', 30000, 2022, 14000],
+        ]
+    )
     cleaned = clean_cars(pd.concat([legacy, website], ignore_index=True), current_year=2026)
     assert sorted(cleaned['Nom']) == ['Citroën C3', 'Citroën C4']  # one C4 only
     assert set(cleaned['Marque']) == {'Citroën'}  # one brand, not two
@@ -266,17 +296,20 @@ def test_clean_cars_merges_a_legacy_file_with_the_website_spelling():
 
 # ---------------------------------------------------------------- the report
 
+
 def test_clean_cars_with_report_counts_every_removed_row():
-    df = make_df([
-        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],  # kept
-        [None, 'Essence', 'Manuelle', 50000, 2019, 10000],  # no name
-        ['Peugeot 208', 'Essence', 'Manuelle', None, 2019, 10100],  # no mileage
-        ['Peugeot 208', 'Essence', 'Manuelle', 50003, 1850, 10200],  # impossible year
-        ['Peugeot 208', 'Essence', 'Manuelle', 50004, 2019, 0],  # impossible price
-        ['PEUGEOT 208', 'Essence', 'Manuelle', '50 000 km', 2019, '10 000 €'],  # same as the first one
-        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],  # kept, id 7
-        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 11900],  # same id 7, another price
-    ])
+    df = make_df(
+        [
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],  # kept
+            [None, 'Essence', 'Manuelle', 50000, 2019, 10000],  # no name
+            ['Peugeot 208', 'Essence', 'Manuelle', None, 2019, 10100],  # no mileage
+            ['Peugeot 208', 'Essence', 'Manuelle', 50003, 1850, 10200],  # impossible year
+            ['Peugeot 208', 'Essence', 'Manuelle', 50004, 2019, 0],  # impossible price
+            ['PEUGEOT 208', 'Essence', 'Manuelle', '50 000 km', 2019, '10 000 €'],  # same as the first one
+            ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],  # kept, id 7
+            ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 11900],  # same id 7, another price
+        ]
+    )
     df.insert(0, 'Id', [None, None, None, None, None, None, 7, 7])
     cleaned, report = clean_cars_with_report(df, current_year=2026)
     assert report == {'read': 8, 'missing': 2, 'impossible': 2, 'same_id': 1, 'duplicates': 1, 'kept': 2}
@@ -284,8 +317,12 @@ def test_clean_cars_with_report_counts_every_removed_row():
 
 
 def test_the_report_adds_up():
-    df = make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000 + i, 2019 if i % 3 else 1800, 10000 if i % 4 else None]
-                  for i in range(40)])
+    df = make_df(
+        [
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000 + i, 2019 if i % 3 else 1800, 10000 if i % 4 else None]
+            for i in range(40)
+        ]
+    )
     _, report = clean_cars_with_report(df, current_year=2026)
     removed = report['missing'] + report['impossible'] + report['same_id'] + report['duplicates']
     assert report['read'] == removed + report['kept'] == 40
@@ -307,8 +344,12 @@ def test_format_report():
 
 def test_main_prints_what_was_removed(tmp_path, capsys):
     source = tmp_path / 'raw.csv'
-    make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
-             ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 0]]).to_csv(source, index=False)
+    make_df(
+        [
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
+            ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 0],
+        ]
+    ).to_csv(source, index=False)
     main([str(source), '-o', str(tmp_path / 'clean.csv')])
     output = capsys.readouterr().out
     assert '2 rows read' in output and '1 rows kept' in output

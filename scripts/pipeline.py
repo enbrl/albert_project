@@ -69,15 +69,23 @@ def main(argv=None):
     how_many = parser.add_mutually_exclusive_group()
     how_many.add_argument('--pages', type=int, default=5, help='number of pages to scrape, 24 cars each (default: 5)')
     how_many.add_argument('--all', action='store_true', help='scrape the whole listing (about 10 minutes)')
-    parser.add_argument('--skip-scrape', action='store_true',
-                        help='do not scrape again: use the file already in the data folder')
+    parser.add_argument(
+        '--skip-scrape', action='store_true', help='do not scrape again: use the file already in the data folder'
+    )
     parser.add_argument('--no-report', action='store_true', help='do not make the report and the charts')
-    parser.add_argument('--kind', default='best', choices=('best', *models.MODEL_KINDS),
-                        help="model to train (default: 'best', chosen by the comparison)")
+    parser.add_argument(
+        '--kind',
+        default='best',
+        choices=('best', *models.MODEL_KINDS),
+        help="model to train (default: 'best', chosen by the comparison)",
+    )
     parser.add_argument('--data-dir', default='data', help='folder of the CSV files (default: data)')
     parser.add_argument('--reports-dir', default='reports', help='folder of the report (default: reports)')
-    parser.add_argument('--model', default=models.DEFAULT_MODEL_PATH,
-                        help=f'file where the model is saved (default: {models.DEFAULT_MODEL_PATH})')
+    parser.add_argument(
+        '--model',
+        default=models.DEFAULT_MODEL_PATH,
+        help=f'file where the model is saved (default: {models.DEFAULT_MODEL_PATH})',
+    )
     args = parser.parse_args(argv)
 
     if args.pages < 1:

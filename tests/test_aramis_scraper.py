@@ -1,4 +1,5 @@
 """Tests of scripts/aramis_scraper.py (no access to the real website)."""
+
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -63,6 +64,7 @@ def no_wait(monkeypatch):
 
 # ---------------------------------------------------------------- parsing
 
+
 def test_parse_number_handles_all_kinds_of_spaces():
     assert parse_number('11 559 km') == 11559  # narrow no-break space
     assert parse_number('21\xa0299 €') == 21299  # no-break space
@@ -97,21 +99,24 @@ def test_parse_listing_page_reads_the_id_of_the_listing():
     assert [row['Id'] for row in parse_listing_page(FIXTURE)] == [1036829, 1036830, None]
 
 
-@pytest.mark.parametrize('engine, name, expected', [
-    ('1.2 PureTech 68 BVM5', 'Peugeot 208', 68),  # displacement and gearbox code ignored
-    ('1.5 dCi 100 BVM6', 'Renault Clio', 100),
-    ('2008 Hybrid 145 ch e-DCS6', 'Peugeot 2008', 145),  # explicit 'ch'
-    ('Hybrid 145 e-DCS6', 'Peugeot 3008', 145),
-    ('1.5 L Hybrid+ 197 ch', 'MG ZS', 197),
-    ('BlueHDi 130ch S&S EAT8', 'Peugeot 308', 130),  # 'ch' stuck to the number
-    ('1.6 HDI 16V 92', 'Citroen C4', 92),  # 16V is a code, not a power
-    ('50 kWh - 136', 'Peugeot 2008', 136),  # battery ignored
-    ('75 kWh - RWD', 'Tesla Model 3', None),  # no power written
-    ('208 1.2 PureTech', 'Peugeot 208', None),  # 208 is the model, not a power
-    ('PureTech 5', 'Peugeot 208', None),  # one digit
-    ('', 'Peugeot 208', None),
-    (None, 'Peugeot 208', None),
-])
+@pytest.mark.parametrize(
+    'engine, name, expected',
+    [
+        ('1.2 PureTech 68 BVM5', 'Peugeot 208', 68),  # displacement and gearbox code ignored
+        ('1.5 dCi 100 BVM6', 'Renault Clio', 100),
+        ('2008 Hybrid 145 ch e-DCS6', 'Peugeot 2008', 145),  # explicit 'ch'
+        ('Hybrid 145 e-DCS6', 'Peugeot 3008', 145),
+        ('1.5 L Hybrid+ 197 ch', 'MG ZS', 197),
+        ('BlueHDi 130ch S&S EAT8', 'Peugeot 308', 130),  # 'ch' stuck to the number
+        ('1.6 HDI 16V 92', 'Citroen C4', 92),  # 16V is a code, not a power
+        ('50 kWh - 136', 'Peugeot 2008', 136),  # battery ignored
+        ('75 kWh - RWD', 'Tesla Model 3', None),  # no power written
+        ('208 1.2 PureTech', 'Peugeot 208', None),  # 208 is the model, not a power
+        ('PureTech 5', 'Peugeot 208', None),  # one digit
+        ('', 'Peugeot 208', None),
+        (None, 'Peugeot 208', None),
+    ],
+)
 def test_parse_power(engine, name, expected):
     assert parse_power(engine, name) == expected
 
@@ -152,6 +157,7 @@ def test_parse_listing_page_without_vehicle():
 
 # ---------------------------------------------------------------- scraping with the fake site
 
+
 def test_scrape_listings_stops_on_empty_page_and_waits_between_requests(fake_site):
     waits = []
     rows = scrape_listings(max_pages=10, sleep=waits.append)
@@ -189,8 +195,11 @@ def test_scrape_listings_keeps_a_car_seen_on_two_pages_once(monkeypatch):
 
 def test_scrape_listings_calls_on_page_after_each_page(fake_site):
     calls = []
-    scrape_listings(max_pages=5, sleep=lambda seconds: None,
-                    on_page=lambda page, page_rows, all_rows: calls.append((page, len(page_rows), len(all_rows))))
+    scrape_listings(
+        max_pages=5,
+        sleep=lambda seconds: None,
+        on_page=lambda page, page_rows, all_rows: calls.append((page, len(page_rows), len(all_rows))),
+    )
     assert calls == [(1, 3, 3), (2, 3, 6)]
 
 
@@ -202,7 +211,9 @@ def test_scrape_listings_error_tells_the_page_to_continue_from(monkeypatch):
     monkeypatch.setattr(requests.Session, 'get', fake_get)
     saved = []
     with pytest.raises(ScrapingStopped) as error:
-        scrape_listings(max_pages=10, sleep=lambda seconds: None, on_page=lambda page, rows, all_rows: saved.append(page))
+        scrape_listings(
+            max_pages=10, sleep=lambda seconds: None, on_page=lambda page, rows, all_rows: saved.append(page)
+        )
     assert error.value.next_page == 3
     assert isinstance(error.value.__cause__, requests.HTTPError)
     assert saved == [1, 2]  # the first two pages were given to on_page before the error
@@ -225,6 +236,7 @@ def test_scrape_listings_404_after_the_first_page_is_the_end_of_the_listing(monk
 
 
 # ---------------------------------------------------------------- retries, with a real (local) server
+
 
 class FlakyServer:
     """A local web server whose first answers are errors (statuses), then the fixture page."""
@@ -294,6 +306,7 @@ def test_does_not_retry_an_error_that_will_not_go_away(flaky_server):
 
 # ---------------------------------------------------------------- saving and loading
 
+
 def test_save_listings_creates_folder_and_keeps_empty_values(tmp_path):
     destination = tmp_path / 'data' / 'cars.csv'  # 'data' does not exist yet
     df = save_listings(parse_listing_page(FIXTURE), str(destination))
@@ -326,8 +339,19 @@ def test_load_listings_gives_back_what_was_saved(tmp_path):
 
 def test_load_listings_of_a_file_made_by_an_older_version(tmp_path):
     destination = tmp_path / 'old.csv'
-    pd.DataFrame([{'Id': 1, 'Nom': 'Peugeot 208', 'Carburant': 'Essence', 'Boite de vitesse': 'Manuelle',
-                   'Km': 1000, 'année': 2020, 'Prix': 9000}]).to_csv(destination, index=False)
+    pd.DataFrame(
+        [
+            {
+                'Id': 1,
+                'Nom': 'Peugeot 208',
+                'Carburant': 'Essence',
+                'Boite de vitesse': 'Manuelle',
+                'Km': 1000,
+                'année': 2020,
+                'Prix': 9000,
+            }
+        ]
+    ).to_csv(destination, index=False)
     row = load_listings(str(destination))[0]
     assert row['Puissance'] is None and row['Motorisation'] is None and row['Finition'] is None
     assert row['Prix'] == 9000
@@ -338,6 +362,7 @@ def test_load_listings_of_a_missing_file(tmp_path):
 
 
 # ---------------------------------------------------------------- command line
+
 
 def test_main_saves_after_every_page_and_prints_progress(fake_site, no_wait, tmp_path, capsys):
     destination = tmp_path / 'cars.csv'

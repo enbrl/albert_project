@@ -1,4 +1,5 @@
 """Tests of scripts/analysis.py, on made-up cars."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -22,21 +23,29 @@ PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
 def make_cars(n=120, seed=1):
     rng = np.random.default_rng(seed)
     names = ['Peugeot 208', 'Peugeot 3008', 'Renault Clio', 'Tesla Model 3', 'Opel Astra']
-    base = {'Peugeot 208': 9000, 'Peugeot 3008': 18000, 'Renault Clio': 8500, 'Tesla Model 3': 30000, 'Opel Astra': 11000}
+    base = {
+        'Peugeot 208': 9000,
+        'Peugeot 3008': 18000,
+        'Renault Clio': 8500,
+        'Tesla Model 3': 30000,
+        'Opel Astra': 11000,
+    }
     rows = []
     for _ in range(n):
         name = str(rng.choice(names))
         year = int(rng.integers(2014, 2026))
         km = int(rng.integers(5_000, 150_000))
-        rows.append({
-            'Nom': name,
-            'Marque': name.split()[0],
-            'Carburant': 'Électrique' if name.startswith('Tesla') else str(rng.choice(['Essence', 'Diesel'])),
-            'Boite de vitesse': 'Manuelle',
-            'Km': km,
-            'année': year,
-            'Prix': int(base[name] - 0.05 * km - 500 * (2026 - year) + 6000),
-        })
+        rows.append(
+            {
+                'Nom': name,
+                'Marque': name.split()[0],
+                'Carburant': 'Électrique' if name.startswith('Tesla') else str(rng.choice(['Essence', 'Diesel'])),
+                'Boite de vitesse': 'Manuelle',
+                'Km': km,
+                'année': year,
+                'Prix': int(base[name] - 0.05 * km - 500 * (2026 - year) + 6000),
+            }
+        )
     return pd.DataFrame(rows)
 
 

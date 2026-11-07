@@ -43,6 +43,7 @@ def euros(value):
 
 # ---------------------------------------------------------------- statistics
 
+
 def summary(df):
     """
     Main figures of a cleaned DataFrame.
@@ -95,6 +96,7 @@ def correlations(df):
 
 # ---------------------------------------------------------------- charts
 
+
 def _save(figure, filename):
     folder = os.path.dirname(filename)
     if folder:
@@ -108,7 +110,7 @@ def plot_price_distribution(df, filename):
     figure = Figure(figsize=(7, 4))
     axes = figure.subplots()
     axes.hist(df['Prix'], bins=30, color=MAIN_COLOR, edgecolor='white')
-    axes.axvline(df['Prix'].median(), color='black', linestyle='--', label=f"median: {euros(df['Prix'].median())}")
+    axes.axvline(df['Prix'].median(), color='black', linestyle='--', label=f'median: {euros(df["Prix"].median())}')
     axes.set_title('How much do the cars cost?')
     axes.set_xlabel('Price (€)')
     axes.set_ylabel('Number of cars')
@@ -175,6 +177,7 @@ CHARTS = [
 
 # ---------------------------------------------------------------- report
 
+
 def _table(df, formats):
     """A small HTML table (the values are escaped)."""
     head = ''.join(f'<th>{html.escape(str(column))}</th>' for column in df.columns)
@@ -189,12 +192,12 @@ def build_report_html(df):
     """The HTML page of the report (the charts are the PNG files next to it)."""
     stats = summary(df)
     facts = [
-        ('Cars', f"{stats['cars']}"),
+        ('Cars', f'{stats["cars"]}'),
         ('Median price', euros(stats['price_median'])),
         ('Mean price', euros(stats['price_mean'])),
-        ('Cheapest / most expensive', f"{euros(stats['price_min'])} / {euros(stats['price_max'])}"),
-        ('Median mileage', f"{stats['km_median']:,.0f} km".replace(',', ' ')),
-        ('Years', f"{stats['year_min']} to {stats['year_max']}"),
+        ('Cheapest / most expensive', f'{euros(stats["price_min"])} / {euros(stats["price_max"])}'),
+        ('Median mileage', f'{stats["km_median"]:,.0f} km'.replace(',', ' ')),
+        ('Years', f'{stats["year_min"]} to {stats["year_max"]}'),
     ]
     facts_html = ''.join(f'<li><strong>{html.escape(k)}</strong> {html.escape(v)}</li>' for k, v in facts)
     corr = correlations(df)
@@ -263,8 +266,10 @@ def main(argv=None):
     if df.empty:
         raise UserError(f'There is no car in {args.data}')
     stats = summary(df)
-    print(f"{stats['cars']} cars, median price {euros(stats['price_median'])}, "
-          f"years {stats['year_min']} to {stats['year_max']}")
+    print(
+        f'{stats["cars"]} cars, median price {euros(stats["price_median"])}, '
+        f'years {stats["year_min"]} to {stats["year_max"]}'
+    )
     print('Correlation with the price:', correlations(df).to_dict())
     report = make_report(df, args.output)
     print(f'Report: {report} (open it in a browser)')

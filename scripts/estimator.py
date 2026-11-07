@@ -76,7 +76,12 @@ def market_summary(cars, name):
     prices = cars.loc[cars['Nom'].str.lower() == normalize_name(name).lower(), 'Prix']
     if prices.empty:
         return None
-    return {'cars': int(len(prices)), 'min': int(prices.min()), 'median': float(prices.median()), 'max': int(prices.max())}
+    return {
+        'cars': int(len(prices)),
+        'min': int(prices.min()),
+        'median': float(prices.median()),
+        'max': int(prices.max()),
+    }
 
 
 def typical_error(model_path):

@@ -1,4 +1,4 @@
-#training models for the project and saving the model
+# training models for the project and saving the model
 """Train, compare, evaluate, save and use models that estimate the price of a used car.
 
 The input is the cleaned file made by scripts/datacleaning.py, with the columns
@@ -71,8 +71,11 @@ MIN_SHARE_FILLED = 0.5
 
 def feature_columns(df):
     """The columns used by the model for this data: the usual ones, plus the optional ones the data has."""
-    optional = [column for column in OPTIONAL_NUMERIC_FEATURES
-                if column in df.columns and df[column].notna().mean() >= MIN_SHARE_FILLED]
+    optional = [
+        column
+        for column in OPTIONAL_NUMERIC_FEATURES
+        if column in df.columns and df[column].notna().mean() >= MIN_SHARE_FILLED
+    ]
     return FEATURES + optional
 
 
@@ -123,13 +126,17 @@ def build_model(kind=DEFAULT_KIND, random_state=42, columns=None):
     elif kind == 'boosting':
         labels = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
         regressor = TransformedTargetRegressor(
-            HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05, min_samples_leaf=5,
-                                          random_state=random_state),
-            func=np.log, inverse_func=np.exp)
+            HistGradientBoostingRegressor(
+                max_iter=300, learning_rate=0.05, min_samples_leaf=5, random_state=random_state
+            ),
+            func=np.log,
+            inverse_func=np.exp,
+        )
     elif kind == 'ridge':
         labels = OneHotEncoder(handle_unknown='ignore')
-        numbers = Pipeline([('impute', SimpleImputer(strategy='median', add_indicator=True)),
-                            ('scale', StandardScaler())])
+        numbers = Pipeline(
+            [('impute', SimpleImputer(strategy='median', add_indicator=True)), ('scale', StandardScaler())]
+        )
         regressor = TransformedTargetRegressor(Ridge(alpha=1.0), func=np.log, inverse_func=np.exp)
     else:
         raise ValueError(f"Unknown kind '{kind}', choose one of {MODEL_KINDS}")
@@ -161,20 +168,28 @@ def compare_models(df, kinds=MODEL_KINDS, n_splits=5, random_state=42):
     columns = feature_columns(df)
     features, prices = prepare_features(df, columns), df[TARGET]
     splitter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    scoring = {'mae': 'neg_mean_absolute_error', 'rmse': 'neg_root_mean_squared_error', 'r2': 'r2',
-               'mape': 'neg_mean_absolute_percentage_error'}
+    scoring = {
+        'mae': 'neg_mean_absolute_error',
+        'rmse': 'neg_root_mean_squared_error',
+        'r2': 'r2',
+        'mape': 'neg_mean_absolute_percentage_error',
+    }
 
     rows = []
     for kind in ('average', *kinds):
-        scores = cross_validate(build_model(kind, random_state, columns), features, prices, cv=splitter, scoring=scoring)
-        rows.append({
-            'model': kind,
-            'mae': -scores['test_mae'].mean(),
-            'mae_std': scores['test_mae'].std(),
-            'rmse': -scores['test_rmse'].mean(),
-            'r2': scores['test_r2'].mean(),
-            'mape': -scores['test_mape'].mean() * 100,
-        })
+        scores = cross_validate(
+            build_model(kind, random_state, columns), features, prices, cv=splitter, scoring=scoring
+        )
+        rows.append(
+            {
+                'model': kind,
+                'mae': -scores['test_mae'].mean(),
+                'mae_std': scores['test_mae'].std(),
+                'rmse': -scores['test_rmse'].mean(),
+                'r2': scores['test_r2'].mean(),
+                'mape': -scores['test_mape'].mean() * 100,
+            }
+        )
     return pd.DataFrame(rows).sort_values('mae').reset_index(drop=True)
 
 
@@ -203,7 +218,9 @@ def train_and_evaluate(df, test_size=0.2, random_state=42, kind=DEFAULT_KIND):
     columns = feature_columns(df)
     features = prepare_features(df, columns)
     prices = df[TARGET]
-    x_train, x_test, y_train, y_test = train_test_split(features, prices, test_size=test_size, random_state=random_state)
+    x_train, x_test, y_train, y_test = train_test_split(
+        features, prices, test_size=test_size, random_state=random_state
+    )
 
     model = build_model(kind, random_state, columns)
     model.fit(x_train, y_train)
@@ -243,11 +260,13 @@ def feature_importance(df, kind=DEFAULT_KIND, test_size=0.2, n_repeats=10, rando
     _check_size(df)
     columns = feature_columns(df)
     features = prepare_features(df, columns)
-    x_train, x_test, y_train, y_test = train_test_split(features, df[TARGET], test_size=test_size,
-                                                        random_state=random_state)
+    x_train, x_test, y_train, y_test = train_test_split(
+        features, df[TARGET], test_size=test_size, random_state=random_state
+    )
     model = build_model(kind, random_state, columns).fit(x_train, y_train)
-    result = permutation_importance(model, x_test, y_test, scoring='neg_mean_absolute_error',
-                                    n_repeats=n_repeats, random_state=random_state)
+    result = permutation_importance(
+        model, x_test, y_test, scoring='neg_mean_absolute_error', n_repeats=n_repeats, random_state=random_state
+    )
     table = pd.DataFrame({'column': columns, 'importance': result.importances_mean, 'std': result.importances_std})
     return table.sort_values('importance', ascending=False).reset_index(drop=True)
 
@@ -327,8 +346,10 @@ def compatibility_problem(metadata):
     """
     saved = ((metadata or {}).get('versions') or {}).get('scikit-learn')
     if saved and _minor(saved) != _minor(sklearn.__version__):
-        return (f'this model was saved with scikit-learn {saved}, but scikit-learn {sklearn.__version__} is installed: '
-                'train it again if the results look wrong')
+        return (
+            f'this model was saved with scikit-learn {saved}, but scikit-learn {sklearn.__version__} is installed: '
+            'train it again if the results look wrong'
+        )
     return None
 
 
@@ -336,11 +357,13 @@ def describe_model(metadata):
     """The lines that tell what a saved model is, from its information."""
     metrics = metadata.get('metrics') or {}
     lines = [
-        f"Model: {metadata.get('kind', '?')}, trained on {metadata.get('cars', '?')} cars on {metadata.get('created', '?')}",
-        f"Columns: {', '.join(metadata.get('columns') or [])}",
+        f'Model: {metadata.get("kind", "?")}, trained on {metadata.get("cars", "?")} cars on {metadata.get("created", "?")}',
+        f'Columns: {", ".join(metadata.get("columns") or [])}',
     ]
     if 'mae' in metrics:
-        lines.append(f"Mean error on cars it had not seen: {metrics['mae']:.0f} EUR ({metrics.get('mape', 0):.1f} % of the price)")
+        lines.append(
+            f'Mean error on cars it had not seen: {metrics["mae"]:.0f} EUR ({metrics.get("mape", 0):.1f} % of the price)'
+        )
     versions = metadata.get('versions') or {}
     lines.append('Saved with: ' + ', '.join(f'{name} {version}' for name, version in versions.items()))
     problem = compatibility_problem(metadata)
@@ -366,14 +389,18 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None):
     - year: year of the first registration
     - power: power in horsepower; used only if the model was trained with the power (otherwise ignored)
     """
-    car = pd.DataFrame([{
-        'Nom': name,
-        'Carburant': fuel,
-        'Boite de vitesse': gearbox,
-        'Km': km,
-        'année': year,
-        'Puissance': np.nan if power is None else power,
-    }])
+    car = pd.DataFrame(
+        [
+            {
+                'Nom': name,
+                'Carburant': fuel,
+                'Boite de vitesse': gearbox,
+                'Km': km,
+                'année': year,
+                'Puissance': np.nan if power is None else power,
+            }
+        ]
+    )
     columns = list(model.feature_names_in_)  # the columns the model was trained with
     return float(model.predict(prepare_features(car, columns))[0])
 
@@ -381,11 +408,21 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Compare, train and save the used-car price model')
     parser.add_argument('data', nargs='?', help='cleaned CSV file (made by scripts/datacleaning.py)')
-    parser.add_argument('--model', default=DEFAULT_MODEL_PATH, help=f'file where the model is saved (default: {DEFAULT_MODEL_PATH})')
-    parser.add_argument('--kind', default='best', choices=('best', *MODEL_KINDS),
-                        help="model to train (default: 'best', the one with the lowest error in the comparison)")
-    parser.add_argument('--compare', action='store_true', help='only show the comparison of the models, do not save anything')
-    parser.add_argument('--info', metavar='MODEL', help='show what a saved model is (date, cars, error, versions) and stop')
+    parser.add_argument(
+        '--model', default=DEFAULT_MODEL_PATH, help=f'file where the model is saved (default: {DEFAULT_MODEL_PATH})'
+    )
+    parser.add_argument(
+        '--kind',
+        default='best',
+        choices=('best', *MODEL_KINDS),
+        help="model to train (default: 'best', the one with the lowest error in the comparison)",
+    )
+    parser.add_argument(
+        '--compare', action='store_true', help='only show the comparison of the models, do not save anything'
+    )
+    parser.add_argument(
+        '--info', metavar='MODEL', help='show what a saved model is (date, cars, error, versions) and stop'
+    )
     args = parser.parse_args(argv)
 
     if args.info:
@@ -411,10 +448,12 @@ def main(argv=None):
 
     kind = best_kind(comparison) if args.kind == 'best' else args.kind
     _, metrics = train_and_evaluate(df, kind=kind)
-    print(f"\nModel: {kind}. Cars used to train: {metrics['n_train']}, to test: {metrics['n_test']}")
-    print(f"Mean error: {metrics['mae']:.0f} EUR, {metrics['mape']:.1f} % of the price "
-          f"(always guessing the mean price: {metrics['baseline_mae']:.0f} EUR)")
-    print(f"RMSE: {metrics['rmse']:.0f} EUR, R2: {metrics['r2']:.2f}")
+    print(f'\nModel: {kind}. Cars used to train: {metrics["n_train"]}, to test: {metrics["n_test"]}')
+    print(
+        f'Mean error: {metrics["mae"]:.0f} EUR, {metrics["mape"]:.1f} % of the price '
+        f'(always guessing the mean price: {metrics["baseline_mae"]:.0f} EUR)'
+    )
+    print(f'RMSE: {metrics["rmse"]:.0f} EUR, R2: {metrics["r2"]:.2f}')
 
     model = train_final_model(df, kind=kind)  # the saved model learns from all the cars
     save_model(model, args.model, make_metadata(df, kind, metrics, columns))

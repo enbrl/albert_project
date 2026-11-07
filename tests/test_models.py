@@ -1,4 +1,5 @@
 """Tests of scripts/models.py, on made-up cars whose price follows a known rule."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -39,7 +40,9 @@ def make_cars(n=400, seed=0):
         gearbox = str(rng.choice(['Manuelle', 'Automatique']))
         price = NAMES[name] * 0.9 ** (2026 - year) * (1 - 0.25 * km / 100_000) * (1.03 if fuel == 'Diesel' else 1)
         price *= rng.normal(1, 0.03)
-        rows.append({'Nom': name, 'Carburant': fuel, 'Boite de vitesse': gearbox, 'Km': km, 'année': year, 'Prix': int(price)})
+        rows.append(
+            {'Nom': name, 'Carburant': fuel, 'Boite de vitesse': gearbox, 'Km': km, 'année': year, 'Prix': int(price)}
+        )
     return pd.DataFrame(rows)
 
 
@@ -146,6 +149,7 @@ def test_main_trains_and_saves(cars, tmp_path, capsys):
 
 # ---------------------------------------------------------------- kinds of models, comparison
 
+
 @pytest.mark.parametrize('kind', MODEL_KINDS)
 def test_every_kind_of_model_learns_the_price_rule(cars, kind):
     model, metrics = train_and_evaluate(cars, kind=kind)
@@ -172,7 +176,9 @@ def test_compare_models_gives_a_sorted_table_with_the_average_last(comparison):
 
 
 def test_compare_models_is_reproducible(cars_200):
-    pd.testing.assert_frame_equal(compare_models(cars_200, kinds=('ridge',)), compare_models(cars_200, kinds=('ridge',)))
+    pd.testing.assert_frame_equal(
+        compare_models(cars_200, kinds=('ridge',)), compare_models(cars_200, kinds=('ridge',))
+    )
 
 
 def test_best_kind_never_answers_average(comparison):
@@ -187,6 +193,7 @@ def test_compare_models_needs_enough_cars():
 
 
 # ---------------------------------------------------------------- power
+
 
 def test_power_is_used_when_the_data_has_it():
     cars = make_cars_with_power()
@@ -227,6 +234,7 @@ def test_unknown_power_is_replaced_by_the_median():
 
 # ---------------------------------------------------------------- importance
 
+
 def test_feature_importance_finds_what_matters():
     table = feature_importance(make_cars_with_power(), n_repeats=3)
     assert list(table.columns) == ['column', 'importance', 'std']
@@ -239,6 +247,7 @@ def test_feature_importance_finds_what_matters():
 
 
 # ---------------------------------------------------------------- command line
+
 
 def test_main_compares_then_saves_the_best_by_default(cars_200, tmp_path, capsys):
     csv = tmp_path / 'cars_clean.csv'

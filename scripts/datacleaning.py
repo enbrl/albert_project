@@ -1,4 +1,4 @@
-#data cleaning script
+# data cleaning script
 """Clean the scraped used-car data so that it can be used by the model.
 
 The input has the columns of the scrapers and of the notebooks:
@@ -93,7 +93,7 @@ def split_brand(name):
                 best = (count, brand)
     if best is None:
         return (words[0], ' '.join(words[1:])) if words else ('', '')
-    return best[1], ' '.join(words[best[0]:])
+    return best[1], ' '.join(words[best[0] :])
 
 
 def brand_of(name):
@@ -211,8 +211,10 @@ def clean_cars_with_report(df, current_year=None):
     count = len(cleaned)
     cleaned = cleaned[
         (cleaned['Prix'] > 0)
-        & (cleaned['Km'] >= 0) & (cleaned['Km'] <= MAX_KM)
-        & (cleaned['année'] >= FIRST_YEAR) & (cleaned['année'] <= current_year)
+        & (cleaned['Km'] >= 0)
+        & (cleaned['Km'] <= MAX_KM)
+        & (cleaned['année'] >= FIRST_YEAR)
+        & (cleaned['année'] <= current_year)
     ]
 
     report['impossible'] = count - len(cleaned)
@@ -245,18 +247,18 @@ REPORT_LINES = [
 
 def format_report(report):
     """The lines that tell what the cleaning did, from the dictionary made by clean_cars_with_report."""
-    lines = [f"{report['read']} rows read"]
+    lines = [f'{report["read"]} rows read']
     lines += [f'{report[key]:>7} {text}' for key, text in REPORT_LINES]
-    lines.append(f"{report['kept']} rows kept")
+    lines.append(f'{report["kept"]} rows kept')
     return '\n'.join(lines)
-
-
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Clean the scraped used-car data')
     parser.add_argument('inputs', nargs='+', help='one or several CSV files to clean')
-    parser.add_argument('-o', '--output', default='data/cars_clean.csv', help='CSV file to write (default: data/cars_clean.csv)')
+    parser.add_argument(
+        '-o', '--output', default='data/cars_clean.csv', help='CSV file to write (default: data/cars_clean.csv)'
+    )
     args = parser.parse_args(argv)
 
     raw = pd.concat([pd.read_csv(path) for path in args.inputs], ignore_index=True)

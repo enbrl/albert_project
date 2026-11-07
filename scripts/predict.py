@@ -49,9 +49,15 @@ def main(argv=None):
         parser.exit(1, f'No model in {args.model}. Train it first: python -m scripts.models data/cars_clean.csv\n')
     except Exception as error:  # whatever the reason, a file that cannot be read is reported the same way
         # A model file can only be read with the version of scikit-learn that made it (or the file is broken)
-        reason = compatibility_problem(read_metadata(args.model)) or 'it was probably saved with another version of scikit-learn'
-        parser.exit(1, f'The model in {args.model} cannot be read ({type(error).__name__}): {reason}. '
-                       'Train it again with python -m scripts.models data/cars_clean.csv\n')
+        reason = (
+            compatibility_problem(read_metadata(args.model))
+            or 'it was probably saved with another version of scikit-learn'
+        )
+        parser.exit(
+            1,
+            f'The model in {args.model} cannot be read ({type(error).__name__}): {reason}. '
+            'Train it again with python -m scripts.models data/cars_clean.csv\n',
+        )
     problem = compatibility_problem(read_metadata(args.model))
     if problem:
         print(f'Warning: {problem}', file=sys.stderr)  # the model could be read, but the result may differ

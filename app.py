@@ -35,8 +35,11 @@ st.caption('Estimate the price of a used car from a model trained on the aramisa
 with st.sidebar:
     st.header('Files')
     model_path = st.text_input('Trained model', DEFAULT_MODEL_PATH)
-    data_path = st.text_input('Cleaned cars (optional)', 'data/cars_clean.csv',
-                              help='Gives the list of the models and the cars to compare with.')
+    data_path = st.text_input(
+        'Cleaned cars (optional)',
+        'data/cars_clean.csv',
+        help='Gives the list of the models and the cars to compare with.',
+    )
     st.caption('Make them with `python -m scripts.pipeline`.')
 
 
@@ -61,8 +64,10 @@ if not os.path.isfile(model_path):
 try:
     model = get_model(model_path, modified(model_path))
 except Exception as error:  # whatever the reason, say that the file cannot be read
-    st.error(f'The model in `{model_path}` cannot be read ({type(error).__name__}). It was probably saved with another '
-             'version of scikit-learn: train it again with `python -m scripts.models data/cars_clean.csv`.')
+    st.error(
+        f'The model in `{model_path}` cannot be read ({type(error).__name__}). It was probably saved with another '
+        'version of scikit-learn: train it again with `python -m scripts.models data/cars_clean.csv`.'
+    )
     st.stop()
 
 cars = get_cars(data_path, modified(data_path))
@@ -78,9 +83,17 @@ with st.form('car'):
     fuel = left.selectbox('Fuel', fuel_options(cars))
     gearbox = right.selectbox('Gearbox', GEARBOXES)
     km = left.number_input('Mileage (km)', min_value=0, max_value=1_000_000, value=60_000, step=1_000)
-    year = right.number_input('Year of first registration', min_value=FIRST_YEAR, max_value=last_year, value=2019, step=1)
-    power = st.number_input('Power (horsepower), 0 if you do not know', min_value=0, max_value=1500, value=0, step=5,
-                            help='It makes the estimate more precise when the model knows the power.')
+    year = right.number_input(
+        'Year of first registration', min_value=FIRST_YEAR, max_value=last_year, value=2019, step=1
+    )
+    power = st.number_input(
+        'Power (horsepower), 0 if you do not know',
+        min_value=0,
+        max_value=1500,
+        value=0,
+        step=5,
+        help='It makes the estimate more precise when the model knows the power.',
+    )
     submitted = st.form_submit_button('Estimate the price', type='primary')
 
 if submitted:
@@ -96,6 +109,8 @@ if submitted:
     summary = market_summary(cars, name)
     if summary:
         st.subheader(f'Cars like this in the data: {name}')
-        st.write(f"{summary['cars']} cars, from {euros(summary['min'])} to {euros(summary['max'])} "
-                 f"(median {euros(summary['median'])}). The closest to yours:")
+        st.write(
+            f'{summary["cars"]} cars, from {euros(summary["min"])} to {euros(summary["max"])} '
+            f'(median {euros(summary["median"])}). The closest to yours:'
+        )
         st.dataframe(similar_cars(cars, name, int(year), int(km)), hide_index=True)
