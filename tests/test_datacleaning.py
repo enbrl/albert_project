@@ -130,8 +130,11 @@ def test_clean_cars_cleans_the_engine_columns_when_present():
     df['Puissance'] = [68, '110 ch', 5, 99999]  # 5 and 99999 are not possible powers
     cleaned = clean_cars(df, current_year=2026)
     assert len(cleaned) == 4  # an impossible power does not remove the car
-    assert list(cleaned['Motorisation']) == ['1.2 PureTech 68', None, None, '50 kWh - 136']
-    assert list(cleaned['Finition']) == ['Like', 'GT Line', None, None]
+    # An empty text is None or NaN depending on the version of pandas: only "empty or not" matters
+    assert cleaned['Motorisation'].isna().tolist() == [False, True, True, False]
+    assert cleaned['Motorisation'][[0, 3]].tolist() == ['1.2 PureTech 68', '50 kWh - 136']
+    assert cleaned['Finition'].isna().tolist() == [False, False, True, True]
+    assert cleaned['Finition'][[0, 1]].tolist() == ['Like', 'GT Line']
     assert cleaned['Puissance'].tolist()[:2] == [68, 110]
     assert cleaned['Puissance'].isna().tolist() == [False, False, True, True]
 
