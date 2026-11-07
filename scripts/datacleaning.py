@@ -22,6 +22,7 @@ import unicodedata
 
 import pandas as pd
 
+from scripts.aramis_scraper import parse_power
 from scripts.cli import UserError, run
 
 COLUMNS = ['Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix']
@@ -195,6 +196,15 @@ def clean_cars_with_report(df, current_year=None):
     for column in ENGINE_COLUMNS:
         if column in cleaned.columns:
             cleaned[column] = cleaned[column].map(normalize_text)
+    if 'Motorisation' in cleaned.columns:
+        # The power is read again from the text of the engine, so that a file made by an older version of the scraper is
+        # repaired without scraping again (the first version took the '40' of the Audi '40 TFSIe 204' for the power).
+        # Without the text of the engine (a file of the notebooks), the power already in the file is kept.
+        stored = cleaned[POWER_COLUMN] if POWER_COLUMN in cleaned.columns else [None] * len(cleaned)
+        cleaned[POWER_COLUMN] = [
+            parse_power(engine, name) if isinstance(engine, str) else old
+            for engine, name, old in zip(cleaned['Motorisation'], cleaned['Nom'], stored)  # noqa: B905 (strict= needs Python 3.10)
+        ]
     if POWER_COLUMN in cleaned.columns:  # a power that is not possible is empty, the car is kept
         power = cleaned[POWER_COLUMN].map(to_number)
         power = power.where(power.between(MIN_POWER, MAX_POWER))
