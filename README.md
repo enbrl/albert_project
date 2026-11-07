@@ -17,8 +17,8 @@ Not everything described above is finished yet:
 |------|-------|--------|
 | Scraping of car listings (aramisauto) | `scripts/aramis_scraper.py` | Working (`python -m scripts.aramis_scraper --pages 5`, 5 s between requests as asked by robots.txt) |
 | Scraping example (quotes) | `scripts/datasourcing.py`, `scripts/main.py` | Working, used as a template |
-| Data cleaning | `scripts/datacleaning.py` | Empty, to do |
-| Price model | `scripts/models.py` | Empty, to do |
+| Data cleaning | `scripts/datacleaning.py` | Working (`python -m scripts.datacleaning data/cars_raw.csv -o data/cars_clean.csv`) |
+| Price model | `scripts/models.py` | Working (`python -m scripts.models data/cars_clean.csv`), to be trained on a larger dataset |
 | Data analysis interface | - | To do |
 
 ## Project structure
@@ -27,11 +27,15 @@ Not everything described above is finished yet:
 ├── data/              # scraped data (CSV files are not versioned)
 ├── notebooks/         # exploration and scraping prototypes
 ├── scripts/
-│   ├── datasourcing.py   # scraping + saving to CSV
-│   ├── datacleaning.py   # data cleaning (to do)
-│   ├── models.py         # model training (to do)
-│   └── main.py           # runs the whole pipeline
+│   ├── aramis_scraper.py # scraping of the used-car listings (aramisauto)
+│   ├── datacleaning.py   # data cleaning
+│   ├── models.py         # price model: training, evaluation, prediction
+│   ├── datasourcing.py   # scraping example (quotes) + saving to CSV
+│   └── main.py           # command line of the scraping example
+├── tests/             # automatic tests (pytest)
+├── .github/workflows/ # tests run by GitHub on every pull request
 ├── requirements.txt
+├── LICENSE.md
 └── README.md
 ```
 
@@ -60,6 +64,16 @@ The script scrapes every page of `https://quotes.toscrape.com/` and saves the re
 python -m scripts.main --url https://quotes.toscrape.com/page/5/ --output data/page5.csv
 python -m scripts.main --help
 ```
+
+To get the car data and a price model, run the three steps one after the other:
+
+```bash
+python -m scripts.aramis_scraper --pages 5 --output data/cars_raw.csv        # scrape (5 s between pages)
+python -m scripts.datacleaning data/cars_raw.csv -o data/cars_clean.csv      # clean
+python -m scripts.models data/cars_clean.csv                                # train, evaluate and save the model
+```
+
+The scraper takes 24 cars per page; about 110 pages (around 10 minutes) were needed to get the whole listing when this was written. Several raw files can be given to `datacleaning` (for example the CSV files of the notebooks): they are merged and the duplicates are removed.
 
 To explore the notebooks:
 
