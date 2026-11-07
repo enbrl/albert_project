@@ -67,6 +67,12 @@ Google Drive : https://drive.google.com/drive/folders/1hYUp5XBxwYOfoLZZuGwi5PK2o
 
 Download the files in the `data/` folder. They are not stored in the repository (see `.gitignore`).
 
+## Tests
+```bash
+python -m pytest
+```
+The tests do not use the network. They also run on GitHub (Actions) for every pull request and every push on `main`.
+
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
