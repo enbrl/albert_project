@@ -101,13 +101,16 @@ with st.form('car'):
     km = left.number_input(t('km'), min_value=0, max_value=1_000_000, value=60_000, step=1_000, key='km')
     year = right.number_input(t('year'), min_value=FIRST_YEAR, max_value=last_year, value=2019, step=1, key='year')
     power = st.number_input(t('power'), min_value=0, max_value=1500, value=0, step=5, help=t('power_help'), key='power')
+    battery = st.number_input(
+        t('battery'), min_value=0, max_value=300, value=0, step=5, help=t('battery_help'), key='battery'
+    )
     submitted = st.form_submit_button(t('submit'), type='primary')
 
 if submitted:
     if not name.strip():
         st.warning(t('empty_name'))
         st.stop()
-    price = estimate(model, name, fuel, gearbox, int(km), int(year), int(power))
+    price = estimate(model, name, fuel, gearbox, int(km), int(year), int(power), int(battery))
     st.metric(t('estimated_price'), euros(round(price, -2)))
     mean_error = typical_error(model_path)
     if mean_error:

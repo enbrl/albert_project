@@ -109,6 +109,22 @@ POWER_CLASS = re.compile(r'(?<![\w.])\d{2,3}(?=\s*(?:TFSI\s*e|TFSI|TDI|TSI|g-tro
 HYBRID_SUM = re.compile(r'(?<![\w.])(\d{2,3})\s*\+\s*(\d{2,3})(?![\w.])')
 
 
+BATTERY = re.compile(r'(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)\s*kWh\b', re.IGNORECASE)
+
+
+def parse_battery(engine):
+    """
+    Find the capacity of the battery (in kWh) in the text of the engine.
+
+    Examples: '50 kWh - 136' -> 50.0, '82kWh - 498' -> 82.0, '80,5 Kwh' -> 80.5, '1.2 PureTech 68' -> None.
+
+    Returns:
+    - The capacity as a float, or None if it is not written
+    """
+    match = BATTERY.search(engine) if isinstance(engine, str) else None
+    return float(match.group(1).replace(',', '.')) if match else None
+
+
 def parse_power(engine, name=''):
     """
     Find the power (in horsepower) in the text of the engine.

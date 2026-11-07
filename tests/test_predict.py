@@ -6,7 +6,7 @@ import pytest
 
 from scripts import predict
 from scripts.models import save_model, train_final_model
-from tests.test_models import make_cars, make_cars_with_power
+from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power
 
 
 @pytest.fixture(scope='module')
@@ -231,3 +231,29 @@ def test_impossible_power_is_refused(model_file, power):
             power,
         )
     assert stop.value.code == 2
+
+
+@pytest.fixture(scope='module')
+def model_with_battery_file(tmp_path_factory):
+    path = tmp_path_factory.mktemp('model_battery') / 'price.joblib'
+    save_model(train_final_model(make_cars_with_battery(600)), str(path))
+    return str(path)
+
+
+def test_battery_makes_the_estimate_change(model_with_battery_file):
+    arguments = ['--name', 'Opel Astra', '--fuel', 'Électrique', '--gearbox', 'Automatique', '--km', '40000']
+    arguments += ['--year', '2022']
+    small = run(model_with_battery_file, *arguments, '--battery', '40')
+    large = run(model_with_battery_file, *arguments, '--battery', '100')
+    assert large > small + 1500
+    assert run(model_with_battery_file, *arguments) > 0  # the battery is optional
+
+
+@pytest.mark.parametrize('battery', ['0', '-50'])
+def test_impossible_battery_is_refused(model_file, battery, capsys):
+    arguments = ['--name', 'Opel Astra', '--fuel', 'Électrique', '--gearbox', 'Automatique', '--km', '40000']
+    arguments += ['--year', '2022', '--battery', battery]
+    with pytest.raises(SystemExit) as stop:
+        run(model_file, *arguments)
+    assert stop.value.code == 2
+    assert '--battery must be positive' in capsys.readouterr().err

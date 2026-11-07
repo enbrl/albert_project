@@ -162,7 +162,7 @@ def test_clean_cars_cleans_the_engine_columns_when_present():
 
 def test_clean_cars_without_engine_columns_has_no_engine_columns():
     cleaned = clean_cars(make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000]]), current_year=2026)
-    assert not {'Motorisation', 'Finition', 'Puissance'} & set(cleaned.columns)
+    assert not {'Motorisation', 'Finition', 'Puissance', 'Batterie'} & set(cleaned.columns)
 
 
 def test_normalize_text():
@@ -407,3 +407,22 @@ def test_a_file_without_engine_text_keeps_its_power_column():
     df = make_df([['Peugeot 208', 'Essence', 'Manuelle', 20000, 2021, 25000]])
     df['Puissance'] = [68]
     assert clean_cars(df, current_year=2026)['Puissance'].tolist() == [68]
+
+
+def test_the_battery_is_read_from_the_text_of_the_engine():
+    df = make_df(
+        [
+            ['Peugeot e-208', 'Électrique', 'Automatique', 10000, 2022, 20000],
+            ['Peugeot 208', 'Essence', 'Manuelle', 20000, 2021, 14000],
+            ['Kia EV6', 'Électrique', 'Automatique', 30000, 2022, 30000],
+            ['Dacia Spring', 'Électrique', 'Automatique', 40000, 2021, 9000],
+            ['Tesla Model 3', 'Électrique', 'Automatique', 50000, 2021, 25000],
+            ['BMW X3', 'Hybride rechargeable', 'Automatique', 60000, 2021, 35000],
+        ]
+    )
+    df['Motorisation'] = ['50 kWh - 136', '1.2 PureTech 68', '77,4 kWh - 229', '999 kWh - 45', None, '220 kWh - 299 ch']
+    cleaned = clean_cars(df, current_year=2026)
+    assert cleaned['Batterie'][0] == 50 and cleaned['Batterie'][2] == pytest.approx(77.4)
+    # empty: a petrol car, an impossible 999 kWh, no text, and the typo of a real listing (a plug-in hybrid has 10-25 kWh)
+    assert cleaned['Batterie'].isna().tolist() == [False, True, False, True, True, True]
+    assert cleaned['Puissance'][0] == 136  # the power is still read next to the battery

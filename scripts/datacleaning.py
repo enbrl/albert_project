@@ -22,7 +22,7 @@ import unicodedata
 
 import pandas as pd
 
-from scripts.aramis_scraper import parse_power
+from scripts.aramis_scraper import parse_battery, parse_power
 from scripts.cli import UserError, run
 
 COLUMNS = ['Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix']
@@ -33,12 +33,16 @@ UNKNOWN = 'Inconnu'
 # Optional columns of the scraper: kept and cleaned when they are in the file
 ENGINE_COLUMNS = ['Motorisation', 'Finition']
 POWER_COLUMN = 'Puissance'
+BATTERY_COLUMN = 'Batterie'  # the capacity in kWh of an electric car, read from the text of the engine
 
 # Limits used to remove impossible values (typos, test listings...)
 FIRST_YEAR = 1990
 MAX_KM = 1_000_000
 MIN_POWER = 30
 MAX_POWER = 1500
+# A Citroën AMI has 5.5 kWh, the biggest batteries sold about 120 kWh: '220 kWh' on a plug-in hybrid is a typo
+MIN_BATTERY = 5
+MAX_BATTERY = 150
 
 
 def to_number(value):
@@ -174,7 +178,8 @@ def clean_cars_with_report(df, current_year=None):
       'duplicates' that were removed, and 'kept'). The DataFrame has the same columns plus 'Marque'
       (the brand: 'Alfa Romeo' for 'Alfa Romeo Tonale'). The optional columns Motorisation, Finition
       and Puissance (the power in horsepower, empty when it is not possible) are cleaned and kept
-      when the input has them.
+      when the input has them. With Motorisation there is also 'Batterie', the capacity in kWh of an
+      electric car (empty for the other cars).
     """
     missing = [column for column in COLUMNS if column not in df.columns]
     if missing:
@@ -209,6 +214,12 @@ def clean_cars_with_report(df, current_year=None):
         power = cleaned[POWER_COLUMN].map(to_number)
         power = power.where(power.between(MIN_POWER, MAX_POWER))
         cleaned[POWER_COLUMN] = pd.array(power, dtype='Int64')
+
+    if 'Motorisation' in cleaned.columns:  # '50 kWh - 136': an electric car is worth more with a bigger battery
+        battery = pd.Series(
+            [parse_battery(engine) for engine in cleaned['Motorisation']], index=cleaned.index, dtype='float64'
+        )
+        cleaned[BATTERY_COLUMN] = battery.where(battery.between(MIN_BATTERY, MAX_BATTERY))
 
     report = {'read': len(df)}
 
