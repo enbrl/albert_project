@@ -38,7 +38,7 @@ BATTERY_COLUMN = 'Batterie'  # the capacity in kWh of an electric car, read from
 # Limits used to remove impossible values (typos, test listings...)
 FIRST_YEAR = 1990
 MAX_KM = 1_000_000
-MIN_POWER = 30
+MIN_POWER = 5  # a licence-free car (Citroën AMI) has 8 hp
 MAX_POWER = 1500
 # A Citroën AMI has 5.5 kWh, the biggest batteries sold about 120 kWh: '220 kWh' on a plug-in hybrid is a typo
 MIN_BATTERY = 5

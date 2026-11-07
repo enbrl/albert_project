@@ -126,8 +126,23 @@ def test_parse_listing_page_reads_the_id_of_the_listing():
         ('T6 Hybride Rechargeable 253 + 145 AWD Geartronic 8', 'Volvo XC60', 253),
         ('1.5 T5 Recharge 180+82 DCT7', 'Volvo XC40', 180),
         ('Cooper SE 125 + 95 ALL4 BVA6', 'Mini Mini', 125),
+        # Toyota, Lexus and BMW write the power of a hybrid with an 'h'
+        ('116h', 'Toyota Yaris Cross', 116),
+        ('130h 2WD', 'Toyota Yaris Cross', 130),
+        ('xDrive 30e 292h BVA8', 'BMW X3', 292),
+        # a power written with its unit can be small: a licence-free car
+        ('5.5 kWh - 8ch', 'Citroën AMI', 8),
+        ('Moteur 4 ch', 'Unknown', None),  # below 5 hp: not a car
+        # BMW write the code of the model before the power
+        ('220 170 DKG7', 'BMW Série 2 Gran Coupé', 170),
+        ('Gran Coupe 216 122 ch DKG7', 'BMW Série 2 Gran Coupé', 122),
+        # Audi e-tron: the power class before 'quattro', but not the power before it
+        ('55 quattro 408', 'Audi E-tron', 408),
+        ('40 TDI 204 Quattro S tronic', 'Audi Q5 Sportback', 204),
+        ('35 TDI 150 S tronic 7 quattro', 'Audi Q2', 150),
         # what already worked must not change
         ('2.0 ECOBLUE 105 BVM6 280 L1H1', 'Ford Transit', 105),  # 280 is the model of the van
+        ('320 L2H1 2.0 EcoBlue 150 ch', 'Ford Tourneo Custom', 150),
         ('1.5 TSI 150 DSG7', 'Volkswagen Golf', 150),  # Volkswagen writes the displacement first
         ('2.0 TDI 150 DSG7', 'Volkswagen Passat', 150),
         ('1.5 L Hybrid+ 197 ch', 'MG ZS', 197),
