@@ -146,7 +146,7 @@ def test_clean_cars_cleans_the_engine_columns_when_present():
     )
     df['Motorisation'] = ['  1.2   PureTech 68 ', '', None, '50 kWh - 136']
     df['Finition'] = ['Like', 'GT  Line', None, ' ']
-    df['Puissance'] = [68, '110 ch', 5, 99999]  # 5 and 99999 are not possible powers
+    df['Puissance'] = [68, '110 ch', 4, 99999]  # 4 and 99999 are not possible powers (a Citroën AMI has 8 hp)
     cleaned = clean_cars(df, current_year=2026)
     assert len(cleaned) == 4  # an impossible power does not remove the car
     # An empty text is None or NaN depending on the version of pandas: only "empty or not" matters
@@ -426,3 +426,14 @@ def test_the_battery_is_read_from_the_text_of_the_engine():
     # empty: a petrol car, an impossible 999 kWh, no text, and the typo of a real listing (a plug-in hybrid has 10-25 kWh)
     assert cleaned['Batterie'].isna().tolist() == [False, True, False, True, True, True]
     assert cleaned['Puissance'][0] == 136  # the power is still read next to the battery
+
+
+def test_the_small_power_of_a_licence_free_car_is_kept():
+    df = make_df(
+        [
+            ['Citroën AMI', 'Électrique', 'Automatique', 5000, 2023, 7999],
+            ['Toyota Yaris Cross', 'Hybride', 'Automatique', 30000, 2022, 24000],
+        ]
+    )
+    df['Motorisation'] = ['5.5 kWh - 8ch', '116h 2WD']
+    assert clean_cars(df, current_year=2026)['Puissance'].tolist() == [8, 116]

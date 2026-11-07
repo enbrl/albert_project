@@ -71,6 +71,8 @@ INTEGER_COLUMNS = ['Id', 'Km', 'année', 'Prix', 'Puissance']
 # Power below and above these values is not a power (it is another number of the text)
 MIN_POWER = 30
 MAX_POWER = 1000
+# A number written with its unit ('8ch', '116h') is a power even when it is small: a licence-free car (Citroën AMI) has 8 hp
+MIN_WRITTEN_POWER = 5
 
 
 class ScrapingStopped(Exception):
@@ -103,10 +105,19 @@ def _text(card, selector):
 
 
 # Audi (and its group) write a power CLASS before the horsepower: '40 TFSIe 204', '35 TDI 150'. The 40 and the 35 are not horsepower.
-POWER_CLASS = re.compile(r'(?<![\w.])\d{2,3}(?=\s*(?:TFSI\s*e|TFSI|TDI|TSI|g-tron|e-tron)\b)', re.IGNORECASE)
+# 'quattro' only when the power comes after it: in '40 TDI 204 Quattro', 204 is the power.
+POWER_CLASS = re.compile(
+    r'(?<![\w.])\d{2,3}(?=\s*(?:TFSI\s*e|TFSI|TDI|TSI|g-tron|e-tron)\b|\s*quattro\s+\d)', re.IGNORECASE
+)
 
 # A hybrid writes its engine and its electric motor: '253 + 145', '303 + 87 ch'. The power kept is the engine, the first number.
 HYBRID_SUM = re.compile(r'(?<![\w.])(\d{2,3})\s*\+\s*(\d{2,3})(?![\w.])')
+
+# Toyota, Lexus and BMW write the power of a hybrid with an 'h': '116h', 'xDrive 30e 292h' (116 and 292 hp)
+HYBRID_H = re.compile(r'(?<![\w.])(\d{2,3})h\b')
+
+# BMW write the code of the model just before the power: '220 170 DKG7' is a 220 of 170 hp
+MODEL_CODE = re.compile(r'(?<![\w.])\d{3}(?=\s+\d{2,3}(?![\w.]))')
 
 
 BATTERY = re.compile(r'(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)\s*kWh\b', re.IGNORECASE)
@@ -131,11 +142,14 @@ def parse_power(engine, name=''):
 
     Examples: '1.2 PureTech 68 BVM5' -> 68, '2008 Hybrid 145 ch e-DCS6' -> 145,
     '50 kWh - 136' -> 136, '75 kWh - RWD' -> None, '40 TFSIe 204 S tronic 6' -> 204,
-    '2.0 T8 Twin Engine 303 + 87 ch' -> 303.
+    '2.0 T8 Twin Engine 303 + 87 ch' -> 303, '116h' -> 116, '5.5 kWh - 8ch' -> 8, '220 170 DKG7' -> 170,
+    '55 quattro 408' -> 408.
 
     The number of the model (for example 2008 in 'Peugeot 2008'), the displacement
-    (1.2), the battery (50 kWh), the power class of Audi (the 40 of '40 TFSIe') and the codes
-    stuck to letters (BVM5, 16V) are ignored. For a hybrid ('253 + 145') the engine is kept.
+    (1.2), the battery (50 kWh), the power class of Audi (the 40 of '40 TFSIe', the 55 of '55 quattro'), the code
+    of a BMW before its power (the 220 of '220 170') and the codes stuck to letters (BVM5, 16V) are ignored.
+    For a hybrid ('253 + 145') the engine is kept. A power written with its unit ('8ch', '116h') can be as low
+    as 5 hp; a number alone must be at least 30 to be read as a power.
 
     Parameters:
     - engine: text of the engine
@@ -150,18 +164,20 @@ def parse_power(engine, name=''):
     text = re.sub(r'\b\d+\s*kWh\b', ' ', text, flags=re.IGNORECASE)  # battery: 50 kWh
     text = POWER_CLASS.sub(' ', text)  # Audi: '40 TFSIe 204' -> ' TFSIe 204'
     hybrid = HYBRID_SUM.search(text)
-    explicit = re.search(r'\b(\d{2,3})\s*ch\b', text, flags=re.IGNORECASE)  # '145 ch'
+    written = re.search(r'\b(\d{1,3})\s*ch\b', text, flags=re.IGNORECASE) or HYBRID_H.search(text)  # '145 ch', '116h'
+    minimum = MIN_POWER
     if hybrid:
         candidates = [hybrid.group(1)]
-    elif explicit:
-        candidates = [explicit.group(1)]
+    elif written:
+        candidates, minimum = [written.group(1)], MIN_WRITTEN_POWER
     else:
+        text = MODEL_CODE.sub(' ', text)  # BMW: '220 170' -> ' 170'
         model_numbers = set(re.findall(r'\d+', name or ''))
         # a number alone, or stuck to 'S tronic' ('150S tronic 7')
         numbers = re.findall(r'(?<![\w.])(\d{2,3})(?:(?=S\s?tronic)|(?![\w.]))', text)
         candidates = [n for n in numbers if n not in model_numbers]
     for candidate in candidates:
-        if MIN_POWER <= int(candidate) <= MAX_POWER:
+        if minimum <= int(candidate) <= MAX_POWER:
             return int(candidate)
     return None
 
