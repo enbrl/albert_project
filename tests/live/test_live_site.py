@@ -9,6 +9,7 @@ GitHub runs them once a week (.github/workflows/site-check.yml): if the website
 changes its pages, the scraper reads nothing or empty values and a test fails,
 before somebody scrapes for nothing.
 """
+
 import time
 from urllib.robotparser import RobotFileParser
 
@@ -23,7 +24,9 @@ pytestmark = pytest.mark.live
 # On a listing page, at least this share of the cars must have each field
 MIN_SHARE = 0.9
 # The fields that must always be found (the Id only exists in the more recent versions of the scraper)
-FIELDS = [c for c in ['Id', 'Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix'] if c in aramis_scraper.COLUMNS]
+FIELDS = [
+    c for c in ['Id', 'Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix'] if c in aramis_scraper.COLUMNS
+]
 
 
 def _identify(row):
@@ -62,12 +65,16 @@ def test_the_second_page_has_other_cars(first_page_rows):
     second = parse_listing_page(fetch_page(2))
     assert second, 'No car on the second page'
     first_cars = {_identify(row) for row in first_page_rows}
-    assert len({_identify(row) for row in second} & first_cars) <= 3  # the listing can move a little between two requests
+    assert (
+        len({_identify(row) for row in second} & first_cars) <= 3
+    )  # the listing can move a little between two requests
 
 
 def test_robots_txt_still_allows_our_pages():
     time.sleep(aramis_scraper.CRAWL_DELAY)
-    response = requests.get('https://www.aramisauto.com/robots.txt', headers=aramis_scraper.HEADERS, timeout=aramis_scraper.REQUEST_TIMEOUT)
+    response = requests.get(
+        'https://www.aramisauto.com/robots.txt', headers=aramis_scraper.HEADERS, timeout=aramis_scraper.REQUEST_TIMEOUT
+    )
     response.raise_for_status()
     robots = RobotFileParser()
     robots.parse(response.text.splitlines())

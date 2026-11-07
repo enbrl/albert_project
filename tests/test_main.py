@@ -1,4 +1,5 @@
 """Tests of the command line of scripts/main.py (no network: requests.get is replaced)."""
+
 import pandas as pd
 import pytest
 

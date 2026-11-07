@@ -1,4 +1,5 @@
 """Tests of scripts/datasourcing.py (no network: requests.get is replaced)."""
+
 import pandas as pd
 import pytest
 import requests

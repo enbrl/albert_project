@@ -1,4 +1,5 @@
 """Tests of the information saved with a model (scripts/models.py) and its use by scripts/predict.py."""
+
 import json
 
 import pytest
@@ -113,6 +114,7 @@ def test_describe_a_model_with_little_information():
 
 # ---------------------------------------------------------------- command line
 
+
 def test_main_saves_the_information_and_info_shows_it(cars, tmp_path, capsys):
     csv = tmp_path / 'cars.csv'
     cars.to_csv(csv, index=False)
@@ -141,6 +143,7 @@ def test_main_needs_data_or_info(capsys):
 
 
 # ---------------------------------------------------------------- predict
+
 
 def saved_model(trained, tmp_path, versions=None):
     destination = tmp_path / 'price.joblib'

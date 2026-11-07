@@ -1,4 +1,5 @@
 """Tests of scripts/pipeline.py."""
+
 import os
 from pathlib import Path
 
@@ -39,6 +40,7 @@ def names(calls):
 
 # ---------------------------------------------------------------- the order and the arguments
 
+
 def test_the_four_steps_run_in_order_with_the_files_of_the_readme(calls, capsys):
     pipeline.main([])
     assert calls == [
@@ -75,15 +77,32 @@ def test_no_report(calls):
 
 
 def test_kind_folders_and_model_are_given_to_the_steps(calls, tmp_path):
-    pipeline.main(['--kind', 'ridge', '--data-dir', str(tmp_path / 'd'), '--reports-dir', str(tmp_path / 'r'),
-                   '--model', str(tmp_path / 'm.joblib')])
+    pipeline.main(
+        [
+            '--kind',
+            'ridge',
+            '--data-dir',
+            str(tmp_path / 'd'),
+            '--reports-dir',
+            str(tmp_path / 'r'),
+            '--model',
+            str(tmp_path / 'm.joblib'),
+        ]
+    )
     by_name = dict(calls)
     assert by_name['scrape'][-1] == str(tmp_path / 'd' / 'cars_raw.csv')
     assert by_name['report'][-1] == str(tmp_path / 'r')
-    assert by_name['train'] == [str(tmp_path / 'd' / 'cars_clean.csv'), '--kind', 'ridge', '--model', str(tmp_path / 'm.joblib')]
+    assert by_name['train'] == [
+        str(tmp_path / 'd' / 'cars_clean.csv'),
+        '--kind',
+        'ridge',
+        '--model',
+        str(tmp_path / 'm.joblib'),
+    ]
 
 
 # ---------------------------------------------------------------- wrong options
+
 
 def test_skip_scrape_without_a_file_is_refused(calls, tmp_path, capsys):
     with pytest.raises(SystemExit) as stop:
@@ -92,7 +111,9 @@ def test_skip_scrape_without_a_file_is_refused(calls, tmp_path, capsys):
     assert 'cars_raw.csv' in capsys.readouterr().err and calls == []
 
 
-@pytest.mark.parametrize('arguments', [['--pages', '0'], ['--pages', '-2'], ['--pages', '3', '--all'], ['--kind', 'magic']])
+@pytest.mark.parametrize(
+    'arguments', [['--pages', '0'], ['--pages', '-2'], ['--pages', '3', '--all'], ['--kind', 'magic']]
+)
 def test_wrong_options_are_refused(calls, arguments):
     with pytest.raises(SystemExit) as stop:
         pipeline.main(arguments)
@@ -100,6 +121,7 @@ def test_wrong_options_are_refused(calls, arguments):
 
 
 # ---------------------------------------------------------------- a step that fails
+
 
 def test_a_step_that_stops_the_script_stops_the_pipeline(monkeypatch, calls, capsys):
     monkeypatch.setattr(analysis, 'main', Recorder('report', calls, fail_with=SystemExit(1)))
@@ -144,6 +166,7 @@ def test_debug_variable_shows_the_whole_error(monkeypatch, calls):
 
 # ---------------------------------------------------------------- the real scripts, one after the other
 
+
 def test_the_real_steps_work_together_on_a_scraped_file(tmp_path, capsys):
     raw = tmp_path / 'data' / 'cars_raw.csv'
     raw.parent.mkdir()
@@ -152,8 +175,19 @@ def test_the_real_steps_work_together_on_a_scraped_file(tmp_path, capsys):
     cars.to_csv(raw, index=False)
     model = tmp_path / 'models' / 'price.joblib'
 
-    made = pipeline.main(['--skip-scrape', '--data-dir', str(raw.parent), '--reports-dir', str(tmp_path / 'reports'),
-                          '--model', str(model), '--kind', 'ridge'])
+    made = pipeline.main(
+        [
+            '--skip-scrape',
+            '--data-dir',
+            str(raw.parent),
+            '--reports-dir',
+            str(tmp_path / 'reports'),
+            '--model',
+            str(model),
+            '--kind',
+            'ridge',
+        ]
+    )
 
     assert (raw.parent / 'cars_clean.csv').exists() and model.exists()
     assert len(pd.read_csv(raw.parent / 'cars_clean.csv')) == 80
@@ -175,8 +209,18 @@ def test_the_whole_pipeline_stops_cleanly_when_there_are_too_few_cars(monkeypatc
     """The scraped fixture has only 2 usable cars: the model cannot be trained and the message says so."""
     monkeypatch.setattr(requests.Session, 'get', lambda self, *args, **kwargs: FixturePage())
     with pytest.raises(SystemExit) as stop:
-        pipeline.main(['--pages', '1', '--data-dir', str(tmp_path / 'data'), '--reports-dir', str(tmp_path / 'reports'),
-                       '--model', str(tmp_path / 'm.joblib')])
+        pipeline.main(
+            [
+                '--pages',
+                '1',
+                '--data-dir',
+                str(tmp_path / 'data'),
+                '--reports-dir',
+                str(tmp_path / 'reports'),
+                '--model',
+                str(tmp_path / 'm.joblib'),
+            ]
+        )
     assert stop.value.code == 1
     error = capsys.readouterr().err
     assert 'Stopped at step 4/4 (Train and save the price model)' in error and 'At least 20 cars' in error

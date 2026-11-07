@@ -234,8 +234,9 @@ def fetch_page(page, session=None, url=LISTING_URL):
     return response.text
 
 
-def scrape_listings(max_pages=5, delay=CRAWL_DELAY, sleep=None, start_page=1,
-                    session=None, on_page=None, url=LISTING_URL):
+def scrape_listings(
+    max_pages=5, delay=CRAWL_DELAY, sleep=None, start_page=1, session=None, on_page=None, url=LISTING_URL
+):
     """
     Scrape the pages of the used-car listing.
 
@@ -356,13 +357,14 @@ def main(argv=None):
     except ScrapingStopped as error:
         print(f'Scraping {error}.', file=sys.stderr)
         print('The pages before were saved. To continue:', file=sys.stderr)
-        print(f'  python -m scripts.aramis_scraper --all --start-page {error.next_page} --append '
-              f'--output {args.output}', file=sys.stderr)
+        print(
+            f'  python -m scripts.aramis_scraper --all --start-page {error.next_page} --append --output {args.output}',
+            file=sys.stderr,
+        )
         raise SystemExit(1) from error
 
     if not saved['rows']:  # never replace a good file by an empty one
-        raise UserError('No vehicle was found: the website probably changed its pages. '
-                        f'{args.output} was not changed.')
+        raise UserError(f'No vehicle was found: the website probably changed its pages. {args.output} was not changed.')
     df = save_listings(saved['rows'], args.output)
     print(f'{len(df)} vehicles saved in {args.output}')
     return df

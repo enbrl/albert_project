@@ -6,6 +6,7 @@ repos:
     rev: v0.17.4
     hooks:
       - id: ruff-check
+      - id: ruff-format  # the layout of the code is automatic: nobody has to think about it
 
   # Removes the results saved in the notebooks (they make the files huge and the diffs unreadable)
   - repo: https://github.com/kynan/nbstripout

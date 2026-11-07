@@ -1,7 +1,7 @@
-#data sourcing script
-#create a .csv file with the data scraped from the website
+# data sourcing script
+# create a .csv file with the data scraped from the website
 
-#libraries
+# libraries
 import os  # for creating the output folder
 from urllib.parse import urljoin  # for building absolute URLs
 
@@ -76,9 +76,10 @@ def csv_saving(data, filename):
     df.to_csv(filename, index=False)  # Save the DataFrame to a CSV file without row numbers
     return df  # Return the sorted DataFrame
 
+
 # Start the scraping process from the first page of the site
 
 if __name__ == '__main__':
     quotes_data = fetch_quotes(base_url)
     df_sorted = csv_saving(quotes_data, 'data/quotes_script.csv')
-    print(df_sorted) # Display the sorted DataFrame
+    print(df_sorted)  # Display the sorted DataFrame

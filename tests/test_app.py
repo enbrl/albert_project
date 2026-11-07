@@ -3,6 +3,7 @@
 They are skipped when Streamlit is not installed (it is only needed for the application:
 pip install -r requirements-app.txt).
 """
+
 import json
 from pathlib import Path
 
@@ -67,7 +68,9 @@ def test_estimate_with_the_cars_file(files):
     assert not app.exception
     assert app.metric[0].label == 'Estimated price'
     assert app.metric[0].value.endswith(' €') and app.metric[0].value[0].isdigit()
-    assert any('wrong by 1 560 € on average' in caption.value for caption in app.caption)  # saved with the model, rounded
+    assert any(
+        'wrong by 1 560 € on average' in caption.value for caption in app.caption
+    )  # saved with the model, rounded
     assert 'Cars like this in the data: Peugeot 208' in app.subheader[0].value
     assert len(app.dataframe) == 1 and len(app.dataframe[0].value) == 5  # the 5 closest cars
 

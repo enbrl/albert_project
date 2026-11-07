@@ -1,4 +1,5 @@
 """Tests of the messages shown by the command lines (scripts/cli.py and the scripts that use it)."""
+
 import argparse
 import subprocess
 import sys
@@ -27,6 +28,7 @@ def command(monkeypatch, capsys, main, *arguments):
 
 
 # ---------------------------------------------------------------- the helpers
+
 
 def test_positive_int():
     assert positive_int('5') == 5
@@ -79,6 +81,7 @@ def test_run_returns_the_result_and_can_print_it(capsys):
 
 # ---------------------------------------------------------------- files that do not exist or are wrong
 
+
 @pytest.mark.parametrize('module', [cleaning_script, models, analysis_script])
 def test_missing_input_file(monkeypatch, capsys, tmp_path, module):
     code, error = command(monkeypatch, capsys, module.main, str(tmp_path / 'nothing.csv'))
@@ -120,8 +123,11 @@ def test_not_enough_cars_to_train(monkeypatch, capsys, tmp_path):
 
 # ---------------------------------------------------------------- scraper options and safety
 
-@pytest.mark.parametrize('option, value', [('--pages', '0'), ('--pages', '-3'), ('--pages', 'many'),
-                                           ('--start-page', '0'), ('--start-page', '-1')])
+
+@pytest.mark.parametrize(
+    'option, value',
+    [('--pages', '0'), ('--pages', '-3'), ('--pages', 'many'), ('--start-page', '0'), ('--start-page', '-1')],
+)
 def test_scraper_refuses_impossible_numbers(monkeypatch, capsys, tmp_path, option, value):
     destination = tmp_path / 'cars.csv'
     destination.write_text('keep me')
@@ -169,16 +175,33 @@ def test_scraper_without_vehicle_does_not_create_an_empty_file(monkeypatch, caps
 
 # ---------------------------------------------------------------- the other scripts
 
+
 def test_quotes_script_with_an_address_that_is_not_a_url(monkeypatch, capsys, tmp_path):
-    code, error = command(monkeypatch, capsys, quotes_script.main, '--url', 'not-a-url',
-                          '--output', str(tmp_path / 'q.csv'))
+    code, error = command(
+        monkeypatch, capsys, quotes_script.main, '--url', 'not-a-url', '--output', str(tmp_path / 'q.csv')
+    )
     assert code == 1 and error.startswith('Error: Network problem')
 
 
 @pytest.mark.parametrize('year', ['1700', '2999', '0'])
 def test_predict_refuses_an_impossible_year(monkeypatch, capsys, year):
-    monkeypatch.setattr(sys, 'argv', ['script', '--name', 'Peugeot 208', '--fuel', 'Essence', '--gearbox', 'Manuelle',
-                                      '--km', '1000', '--year', year])
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        [
+            'script',
+            '--name',
+            'Peugeot 208',
+            '--fuel',
+            'Essence',
+            '--gearbox',
+            'Manuelle',
+            '--km',
+            '1000',
+            '--year',
+            year,
+        ],
+    )
     with pytest.raises(SystemExit) as stop:
         predict.main()
     assert stop.value.code == 2
@@ -186,8 +209,11 @@ def test_predict_refuses_an_impossible_year(monkeypatch, capsys, year):
 
 
 def test_predict_refuses_an_empty_name(monkeypatch, capsys):
-    monkeypatch.setattr(sys, 'argv', ['script', '--name', '   ', '--fuel', 'Essence', '--gearbox', 'Manuelle',
-                                      '--km', '1000', '--year', '2020'])
+    monkeypatch.setattr(
+        sys,
+        'argv',
+        ['script', '--name', '   ', '--fuel', 'Essence', '--gearbox', 'Manuelle', '--km', '1000', '--year', '2020'],
+    )
     with pytest.raises(SystemExit) as stop:
         predict.main()
     assert stop.value.code == 2
@@ -195,10 +221,16 @@ def test_predict_refuses_an_empty_name(monkeypatch, capsys):
 
 # ---------------------------------------------------------------- the real command, from a terminal
 
+
 @pytest.mark.parametrize('module', ['scripts.datacleaning', 'scripts.models', 'scripts.analysis'])
 def test_python_m_shows_a_message_not_a_traceback(module, tmp_path):
-    done = subprocess.run([sys.executable, '-m', module, str(tmp_path / 'nothing.csv')],
-                          cwd=ROOT, capture_output=True, text=True, timeout=120)
+    done = subprocess.run(
+        [sys.executable, '-m', module, str(tmp_path / 'nothing.csv')],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
     assert done.returncode == 1
     assert done.stderr.startswith('Error: File not found:')
     assert 'Traceback' not in done.stderr
