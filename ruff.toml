@@ -1,0 +1,12 @@
+# Code checks (https://docs.astral.sh/ruff/). Run: ruff check .
+line-length = 120
+
+# The old notebooks are not checked (their code is a prototype)
+extend-exclude = ["notebooks"]
+
+[lint]
+# E, W: pycodestyle (style errors), F: unused imports and variables, undefined names,
+# B: common bugs
+select = ["E", "W", "F", "B"]
+# Long lines are allowed (URLs, long messages)
+ignore = ["E501"]
