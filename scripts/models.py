@@ -1,15 +1,22 @@
 #training models for the project and saving the model
-"""Train, evaluate, save and use a model that estimates the price of a used car.
+"""Train, compare, evaluate, save and use models that estimate the price of a used car.
 
 The input is the cleaned file made by scripts/datacleaning.py, with the columns
-Nom, Carburant, Boite de vitesse, Km, année, Prix (and optionally Marque).
+Nom, Carburant, Boite de vitesse, Km, année, Prix (and optionally Marque and
+Puissance, the power in horsepower: it is used when the file has it).
 
 Usage (from the root of the project):
 
-    python -m scripts.models data/cars_clean.csv --model models/price_model.joblib
+    python -m scripts.models data/cars_clean.csv                  # the best model is chosen and saved
+    python -m scripts.models data/cars_clean.csv --kind forest    # or boosting, ridge
+    python -m scripts.models data/cars_clean.csv --compare        # only show the comparison
 
-The command trains the model, prints the errors measured on cars the model has
-never seen, and saves the model. To use it in Python:
+How the models are compared: the cars are cut in 5 parts; each model learns on 4 parts and is
+tested on the 5th, 5 times, so every car is used for the test once. The table gives the average
+errors (the lower the better). A model that always answers the mean price is in the table too: the
+others must do much better.
+
+To use a model in Python:
 
     from scripts.models import load_model, predict_price
     model = load_model('models/price_model.joblib')
@@ -24,53 +31,152 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
+from sklearn.dummy import DummyRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import Ridge
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, mean_squared_error, r2_score
+from sklearn.model_selection import KFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
 CATEGORICAL_FEATURES = ['Marque', 'Nom', 'Carburant', 'Boite de vitesse']
 NUMERIC_FEATURES = ['Km', 'année']
+OPTIONAL_NUMERIC_FEATURES = ['Puissance']  # used only when the data has it (and enough of it)
 FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 TARGET = 'Prix'
+
+# The models that can be trained. 'average' only answers the mean price (to compare with).
+MODEL_KINDS = ('forest', 'boosting', 'ridge')
+# The best model on the 2 693 cars of the whole aramisauto listing (see the comparison with --compare)
+DEFAULT_KIND = 'boosting'
 
 DEFAULT_MODEL_PATH = 'models/price_model.joblib'
 
 # Below this number of cars, the measured errors would mean nothing
 MIN_ROWS = 20
 
+# A column such as Puissance is used only if at least this share of the cars have it
+MIN_SHARE_FILLED = 0.5
 
-def prepare_features(df):
+
+def feature_columns(df):
+    """The columns used by the model for this data: the usual ones, plus the optional ones the data has."""
+    optional = [column for column in OPTIONAL_NUMERIC_FEATURES
+                if column in df.columns and df[column].notna().mean() >= MIN_SHARE_FILLED]
+    return FEATURES + optional
+
+
+def prepare_features(df, columns=None):
     """
     Return the columns used by the model (the brand is the first word of the name if 'Marque' is missing).
+
+    Parameters:
+    - df: DataFrame of cars
+    - columns: the columns to return (by default: feature_columns(df))
     """
     features = df.copy()
     if 'Marque' not in features.columns:
         features['Marque'] = features['Nom'].astype(str).str.split().str[0]
-    missing = [column for column in FEATURES if column not in features.columns]
+    columns = columns if columns is not None else feature_columns(features)
+    missing = [column for column in columns if column not in features.columns]
     if missing:
         raise ValueError(f'Missing columns: {missing}')
-    return features[FEATURES]
+    return features[columns]
 
 
-def build_model(random_state=42):
+def build_model(kind=DEFAULT_KIND, random_state=42, columns=None):
     """
-    Build the (not trained) model: one-hot encoding of the labels + random forest.
+    Build a model that is not trained yet.
 
-    A random forest needs no scaling and handles the link between mileage, age and price well.
-    Labels never seen during the training are ignored instead of raising an error.
+    Parameters:
+    - kind: 'forest' (random forest), 'boosting' (gradient boosting) or 'ridge' (linear model);
+      'average' is a model that always answers the mean price (to compare with)
+    - random_state: seed, to get the same result at each run
+    - columns: the columns the model will use (by default: FEATURES)
+
+    The labels (brand, fuel...) are encoded as numbers and the missing numbers (an unknown power)
+    are replaced by the median. Labels never seen during the training are ignored instead of
+    raising an error. The linear model and the boosting learn the logarithm of the price: a mistake
+    of 10 % counts the same on a cheap car and on an expensive one.
     """
-    preprocessing = ColumnTransformer([
-        ('labels', OneHotEncoder(handle_unknown='ignore'), CATEGORICAL_FEATURES),
-        ('numbers', 'passthrough', NUMERIC_FEATURES),
-    ])
-    forest = RandomForestRegressor(n_estimators=300, min_samples_leaf=2, random_state=random_state, n_jobs=-1)
-    return Pipeline([('preprocessing', preprocessing), ('forest', forest)])
+    columns = columns if columns is not None else FEATURES
+    categorical = [c for c in columns if c in CATEGORICAL_FEATURES]
+    numeric = [c for c in columns if c not in CATEGORICAL_FEATURES]
+
+    if kind == 'average':
+        return Pipeline([('model', DummyRegressor(strategy='mean'))])
+
+    numbers = SimpleImputer(strategy='median', add_indicator=True)
+    if kind == 'forest':
+        labels = OneHotEncoder(handle_unknown='ignore')
+        regressor = RandomForestRegressor(n_estimators=300, min_samples_leaf=2, random_state=random_state, n_jobs=-1)
+    elif kind == 'boosting':
+        labels = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
+        regressor = TransformedTargetRegressor(
+            HistGradientBoostingRegressor(max_iter=300, learning_rate=0.05, min_samples_leaf=5,
+                                          random_state=random_state),
+            func=np.log, inverse_func=np.exp)
+    elif kind == 'ridge':
+        labels = OneHotEncoder(handle_unknown='ignore')
+        numbers = Pipeline([('impute', SimpleImputer(strategy='median', add_indicator=True)),
+                            ('scale', StandardScaler())])
+        regressor = TransformedTargetRegressor(Ridge(alpha=1.0), func=np.log, inverse_func=np.exp)
+    else:
+        raise ValueError(f"Unknown kind '{kind}', choose one of {MODEL_KINDS}")
+
+    preprocessing = ColumnTransformer([('labels', labels, categorical), ('numbers', numbers, numeric)])
+    return Pipeline([('preprocessing', preprocessing), ('model', regressor)])
 
 
-def train_and_evaluate(df, test_size=0.2, random_state=42):
+def _check_size(df):
+    if len(df) < MIN_ROWS:
+        raise ValueError(f'At least {MIN_ROWS} cars are needed, got {len(df)}')
+
+
+def compare_models(df, kinds=MODEL_KINDS, n_splits=5, random_state=42):
+    """
+    Compare the models with a cross-validation (see the top of this file).
+
+    Parameters:
+    - df: cleaned DataFrame (with the column Prix)
+    - kinds: the models to compare
+    - n_splits: number of parts the cars are cut in
+
+    Returns:
+    - A DataFrame with one row per model, the best first: 'mae' (mean error in euros) and 'mae_std'
+      (how much it varies between the parts), 'rmse', 'r2' (1 is perfect) and 'mape' (mean error in
+      % of the price). The row 'average' is the model that always answers the mean price.
+    """
+    _check_size(df)
+    columns = feature_columns(df)
+    features, prices = prepare_features(df, columns), df[TARGET]
+    splitter = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    scoring = {'mae': 'neg_mean_absolute_error', 'rmse': 'neg_root_mean_squared_error', 'r2': 'r2',
+               'mape': 'neg_mean_absolute_percentage_error'}
+
+    rows = []
+    for kind in ('average', *kinds):
+        scores = cross_validate(build_model(kind, random_state, columns), features, prices, cv=splitter, scoring=scoring)
+        rows.append({
+            'model': kind,
+            'mae': -scores['test_mae'].mean(),
+            'mae_std': scores['test_mae'].std(),
+            'rmse': -scores['test_rmse'].mean(),
+            'r2': scores['test_r2'].mean(),
+            'mape': -scores['test_mape'].mean() * 100,
+        })
+    return pd.DataFrame(rows).sort_values('mae').reset_index(drop=True)
+
+
+def best_kind(comparison):
+    """The model with the lowest mean error in a table made by compare_models (the average model is left out)."""
+    return comparison[comparison['model'] != 'average'].iloc[0]['model']
+
+
+def train_and_evaluate(df, test_size=0.2, random_state=42, kind=DEFAULT_KIND):
     """
     Train the model on a part of the cars and measure its errors on the other part.
 
@@ -78,21 +184,21 @@ def train_and_evaluate(df, test_size=0.2, random_state=42):
     - df: cleaned DataFrame (see scripts/datacleaning.py), with the column Prix
     - test_size: share of the cars kept to measure the errors
     - random_state: seed, to get the same result at each run
+    - kind: the model to train (see build_model)
 
     Returns:
     - (model, metrics): the model trained on the training part, and a dictionary with
-      'mae' (mean error in euros), 'rmse', 'r2' (1 is perfect), 'baseline_mae' (error
-      of a model that always answers the mean price: ours must be much lower),
-      'n_train' and 'n_test'
+      'mae' (mean error in euros), 'rmse', 'r2' (1 is perfect), 'mape' (mean error in % of the
+      price), 'baseline_mae' (error of a model that always answers the mean price: ours must be
+      much lower), 'n_train' and 'n_test'
     """
-    if len(df) < MIN_ROWS:
-        raise ValueError(f'At least {MIN_ROWS} cars are needed, got {len(df)}')
-
-    features = prepare_features(df)
+    _check_size(df)
+    columns = feature_columns(df)
+    features = prepare_features(df, columns)
     prices = df[TARGET]
     x_train, x_test, y_train, y_test = train_test_split(features, prices, test_size=test_size, random_state=random_state)
 
-    model = build_model(random_state)
+    model = build_model(kind, random_state, columns)
     model.fit(x_train, y_train)
     predictions = model.predict(x_test)
 
@@ -100,6 +206,7 @@ def train_and_evaluate(df, test_size=0.2, random_state=42):
         'mae': float(mean_absolute_error(y_test, predictions)),
         'rmse': float(np.sqrt(mean_squared_error(y_test, predictions))),
         'r2': float(r2_score(y_test, predictions)),
+        'mape': float(mean_absolute_percentage_error(y_test, predictions) * 100),
         'baseline_mae': float(mean_absolute_error(y_test, np.full(len(y_test), y_train.mean()))),
         'n_train': int(len(x_train)),
         'n_test': int(len(x_test)),
@@ -107,11 +214,35 @@ def train_and_evaluate(df, test_size=0.2, random_state=42):
     return model, metrics
 
 
-def train_final_model(df, random_state=42):
+def train_final_model(df, random_state=42, kind=DEFAULT_KIND):
     """Train the model on all the cars (to use after the evaluation)."""
-    model = build_model(random_state)
-    model.fit(prepare_features(df), df[TARGET])
+    columns = feature_columns(df)
+    model = build_model(kind, random_state, columns)
+    model.fit(prepare_features(df, columns), df[TARGET])
     return model
+
+
+def feature_importance(df, kind=DEFAULT_KIND, test_size=0.2, n_repeats=10, random_state=42):
+    """
+    Which columns matter most for the price?
+
+    The model is trained on a part of the cars. Then, on the other part, the values of one column
+    are shuffled: the more the error grows, the more the model needed this column.
+
+    Returns:
+    - A DataFrame with one row per column, the most important first: 'importance' is the increase
+      of the mean error (in euros) when the column is shuffled, 'std' how much it varies
+    """
+    _check_size(df)
+    columns = feature_columns(df)
+    features = prepare_features(df, columns)
+    x_train, x_test, y_train, y_test = train_test_split(features, df[TARGET], test_size=test_size,
+                                                        random_state=random_state)
+    model = build_model(kind, random_state, columns).fit(x_train, y_train)
+    result = permutation_importance(model, x_test, y_test, scoring='neg_mean_absolute_error',
+                                    n_repeats=n_repeats, random_state=random_state)
+    table = pd.DataFrame({'column': columns, 'importance': result.importances_mean, 'std': result.importances_std})
+    return table.sort_values('importance', ascending=False).reset_index(drop=True)
 
 
 def save_model(model, filename=DEFAULT_MODEL_PATH):
@@ -127,7 +258,7 @@ def load_model(filename=DEFAULT_MODEL_PATH):
     return joblib.load(filename)
 
 
-def predict_price(model, name, fuel, gearbox, km, year):
+def predict_price(model, name, fuel, gearbox, km, year, power=None):
     """
     Estimate the price (in euros) of one used car.
 
@@ -137,6 +268,7 @@ def predict_price(model, name, fuel, gearbox, km, year):
     - gearbox: 'Manuelle' or 'Automatique'
     - km: mileage
     - year: year of the first registration
+    - power: power in horsepower; used only if the model was trained with the power (otherwise ignored)
     """
     car = pd.DataFrame([{
         'Nom': name,
@@ -144,23 +276,41 @@ def predict_price(model, name, fuel, gearbox, km, year):
         'Boite de vitesse': gearbox,
         'Km': km,
         'année': year,
+        'Puissance': np.nan if power is None else power,
     }])
-    return float(model.predict(prepare_features(car))[0])
+    columns = list(model.feature_names_in_)  # the columns the model was trained with
+    return float(model.predict(prepare_features(car, columns))[0])
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Train the used-car price model')
+    parser = argparse.ArgumentParser(description='Compare, train and save the used-car price model')
     parser.add_argument('data', help='cleaned CSV file (made by scripts/datacleaning.py)')
     parser.add_argument('--model', default=DEFAULT_MODEL_PATH, help=f'file where the model is saved (default: {DEFAULT_MODEL_PATH})')
+    parser.add_argument('--kind', default='best', choices=('best', *MODEL_KINDS),
+                        help="model to train (default: 'best', the one with the lowest error in the comparison)")
+    parser.add_argument('--compare', action='store_true', help='only show the comparison of the models, do not save anything')
     args = parser.parse_args(argv)
 
     df = pd.read_csv(args.data)
-    _, metrics = train_and_evaluate(df)
-    print(f"Cars used to train: {metrics['n_train']}, to test: {metrics['n_test']}")
-    print(f"Mean error: {metrics['mae']:.0f} EUR (always guessing the mean price: {metrics['baseline_mae']:.0f} EUR)")
+    columns = feature_columns(df)
+    print(f'{len(df)} cars, columns used: {", ".join(columns)}')
+
+    comparison = None
+    if args.compare or args.kind == 'best':
+        comparison = compare_models(df)
+        print('\nComparison (5-fold cross-validation, errors in euros except mape in %):')
+        print(comparison.round({'mae': 0, 'mae_std': 0, 'rmse': 0, 'r2': 2, 'mape': 1}).to_string(index=False))
+    if args.compare:
+        return comparison
+
+    kind = best_kind(comparison) if args.kind == 'best' else args.kind
+    _, metrics = train_and_evaluate(df, kind=kind)
+    print(f"\nModel: {kind}. Cars used to train: {metrics['n_train']}, to test: {metrics['n_test']}")
+    print(f"Mean error: {metrics['mae']:.0f} EUR, {metrics['mape']:.1f} % of the price "
+          f"(always guessing the mean price: {metrics['baseline_mae']:.0f} EUR)")
     print(f"RMSE: {metrics['rmse']:.0f} EUR, R2: {metrics['r2']:.2f}")
 
-    model = train_final_model(df)  # the saved model learns from all the cars
+    model = train_final_model(df, kind=kind)  # the saved model learns from all the cars
     save_model(model, args.model)
     print(f'Model saved in {args.model}')
     return metrics
