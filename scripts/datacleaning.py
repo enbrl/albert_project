@@ -18,6 +18,7 @@ import argparse
 import datetime
 import os
 import re
+import unicodedata
 
 import pandas as pd
 
@@ -54,12 +55,64 @@ def to_number(value):
     return int(digits) if digits else None
 
 
+# The brands that need a rule: the name of the brand is not its first word, or it is spelled in several ways
+# (the legacy files of the notebooks write "Citroen", the website writes "Citroën").
+# canonical spelling -> the spellings found in the data, without accents and in lower case
+BRAND_SPELLINGS = {
+    'Alfa Romeo': ['alfa romeo'],
+    'Aston Martin': ['aston martin'],
+    'Land Rover': ['land rover'],
+    'Rolls-Royce': ['rolls-royce', 'rolls royce'],
+    'Lynk & Co': ['lynk & co', 'lynk&co'],
+    'Mercedes': ['mercedes', 'mercedes-benz', 'mercedes benz'],
+    'Citroën': ['citroen'],
+    'Skoda': ['skoda'],
+}
+
+
+def without_accents(text):
+    """'Citroën' -> 'Citroen'."""
+    decomposed = unicodedata.normalize('NFKD', text)
+    return ''.join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def split_brand(name):
+    """
+    Split a name into the brand and the model.
+
+    'Alfa Romeo Tonale' -> ('Alfa Romeo', 'Tonale'), 'Citroen C4' -> ('Citroën', 'C4'),
+    'Peugeot 208' -> ('Peugeot', '208'). By default the brand is the first word.
+    """
+    words = name.split()
+    best = None  # (number of words of the spelling, canonical brand)
+    for brand, spellings in BRAND_SPELLINGS.items():
+        for spelling in spellings:
+            count = len(spelling.split())
+            matches = len(words) >= count and without_accents(' '.join(words[:count])).lower() == spelling
+            if matches and (best is None or count > best[0]):
+                best = (count, brand)
+    if best is None:
+        return (words[0], ' '.join(words[1:])) if words else ('', '')
+    return best[1], ' '.join(words[best[0]:])
+
+
+def brand_of(name):
+    """The brand of a (clean) name: 'Alfa Romeo Tonale' -> 'Alfa Romeo'."""
+    return split_brand(name)[0]
+
+
 def normalize_name(value):
-    """'  PEUGEOT   308 ' and 'peugeot 308' both become 'Peugeot 308' (short names like MG or C4 stay in capitals)."""
+    """
+    '  PEUGEOT   308 ' and 'peugeot 308' both become 'Peugeot 308' (short names like MG or C4 stay in capitals).
+
+    The brand is written in only one way: 'CITROEN C4' becomes 'Citroën C4', 'Mercedes-Benz GLA' 'Mercedes GLA'.
+    """
     if not isinstance(value, str) or not value.strip():
         return None
     words = value.split()
-    return ' '.join(w if (w.isupper() and len(w) <= 3) else w.capitalize() for w in words)
+    text = ' '.join(w if (w.isupper() and len(w) <= 3) else w.capitalize() for w in words)
+    brand, model = split_brand(text)
+    return f'{brand} {model}'.strip()
 
 
 def normalize_text(value):
@@ -102,7 +155,7 @@ def normalize_gearbox(value):
     return UNKNOWN
 
 
-def clean_cars(df, current_year=None):
+def clean_cars_with_report(df, current_year=None):
     """
     Clean a DataFrame of used cars.
 
@@ -115,9 +168,12 @@ def clean_cars(df, current_year=None):
     - current_year: the latest accepted year (by default: next year)
 
     Returns:
-    - A new DataFrame with the same columns plus 'Marque' (the first word of the name).
-      The optional columns Motorisation, Finition and Puissance (the power in horsepower,
-      empty when it is not possible) are cleaned and kept when the input has them.
+    - (cleaned, report): the new DataFrame and a dictionary that counts the rows ('read', then
+      'missing' (no name, mileage, year or price), 'impossible' (impossible values), 'same_id' and
+      'duplicates' that were removed, and 'kept'). The DataFrame has the same columns plus 'Marque'
+      (the brand: 'Alfa Romeo' for 'Alfa Romeo Tonale'). The optional columns Motorisation, Finition
+      and Puissance (the power in horsepower, empty when it is not possible) are cleaned and kept
+      when the input has them.
     """
     missing = [column for column in COLUMNS if column not in df.columns]
     if missing:
@@ -144,22 +200,57 @@ def clean_cars(df, current_year=None):
         power = power.where(power.between(MIN_POWER, MAX_POWER))
         cleaned[POWER_COLUMN] = pd.array(power, dtype='Int64')
 
+    report = {'read': len(df)}
+
     # The model needs a name, a mileage, a year and a price
+    count = len(cleaned)
     cleaned = cleaned.dropna(subset=['Nom', 'Km', 'année', 'Prix'])
+    report['missing'] = count - len(cleaned)
 
     # Remove impossible values
+    count = len(cleaned)
     cleaned = cleaned[
         (cleaned['Prix'] > 0)
         & (cleaned['Km'] >= 0) & (cleaned['Km'] <= MAX_KM)
         & (cleaned['année'] >= FIRST_YEAR) & (cleaned['année'] <= current_year)
     ]
 
+    report['impossible'] = count - len(cleaned)
+
     cleaned = cleaned.astype({'Km': 'int64', 'année': 'int64', 'Prix': 'int64'})
+    count = len(cleaned)
     if has_id:  # the same Id is the same car, even if it was scraped twice
         cleaned = cleaned[cleaned['Id'].isna() | ~cleaned['Id'].duplicated()]
+    report['same_id'] = count - len(cleaned)
+    count = len(cleaned)
     cleaned = cleaned.drop_duplicates().reset_index(drop=True)
-    cleaned['Marque'] = cleaned['Nom'].str.split().str[0]
-    return cleaned
+    report['duplicates'] = count - len(cleaned)
+    cleaned['Marque'] = cleaned['Nom'].map(brand_of)
+    report['kept'] = len(cleaned)
+    return cleaned, report
+
+
+def clean_cars(df, current_year=None):
+    """Clean a DataFrame of used cars (see clean_cars_with_report, which also counts the removed rows)."""
+    return clean_cars_with_report(df, current_year)[0]
+
+
+REPORT_LINES = [
+    ('missing', 'removed: no name, mileage, year or price'),
+    ('impossible', 'removed: impossible values (price, mileage or year)'),
+    ('same_id', 'removed: same listing Id seen twice'),
+    ('duplicates', 'removed: identical rows'),
+]
+
+
+def format_report(report):
+    """The lines that tell what the cleaning did, from the dictionary made by clean_cars_with_report."""
+    lines = [f"{report['read']} rows read"]
+    lines += [f'{report[key]:>7} {text}' for key, text in REPORT_LINES]
+    lines.append(f"{report['kept']} rows kept")
+    return '\n'.join(lines)
+
+
 
 
 def main(argv=None):
@@ -169,13 +260,14 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     raw = pd.concat([pd.read_csv(path) for path in args.inputs], ignore_index=True)
-    cleaned = clean_cars(raw)
+    cleaned, report = clean_cars_with_report(raw)
 
     folder = os.path.dirname(args.output)
     if folder:
         os.makedirs(folder, exist_ok=True)
     cleaned.to_csv(args.output, index=False)
-    print(f'{len(raw)} rows read, {len(cleaned)} rows kept, saved in {args.output}')
+    print(format_report(report))
+    print(f'Saved in {args.output}')
     return cleaned
 
 
