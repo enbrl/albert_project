@@ -2,6 +2,9 @@
 #create a .csv file with the data scraped from the website
 
 #libraries
+import os  # for creating the output folder
+from urllib.parse import urljoin  # for building absolute URLs
+
 import requests  # for making HTTP requests to web pages
 from bs4 import BeautifulSoup  # for parsing HTML content
 import pandas as pd
@@ -9,22 +12,27 @@ import pandas as pd
 # The base URL of the website we're scraping
 base_url = 'https://quotes.toscrape.com/'
 
-def fetch_quotes(page_url):
+# Maximum time (in seconds) to wait for a server response
+REQUEST_TIMEOUT = 10
+
+
+def fetch_quotes(page_url=base_url):
     """
-    Fetch quotes and authors from a given page URL.
+    Fetch quotes and authors from a given page URL, following the "next" links.
 
     Parameters:
-    - page_url: URL of the page to scrape
+    - page_url: URL of the first page to scrape
 
     Returns:
     - A list of dictionaries, each containing an 'Author' and their 'Citation'
     """
     quotes_data = []  # Initialize an empty list to store quotes and authors
-    response = requests.get(page_url)  # Make a GET request to fetch the page content
 
-    if response.status_code == 200:  # Check if the request was successful (HTTP status code 200)
+    while page_url:  # Loop over the pages instead of using recursion
+        response = requests.get(page_url, timeout=REQUEST_TIMEOUT)  # Make a GET request to fetch the page content
+        response.raise_for_status()  # Stop with a clear error if the request failed (404, 500...)
+
         soup = BeautifulSoup(response.content, 'html.parser')  # Parse the HTML content of the page
-        # print(soup.prettify())
         quotes = soup.find_all('div', class_='quote')  # Find all quote blocks on the page
 
         for quote in quotes:  # Iterate over each quote block
@@ -38,25 +46,35 @@ def fetch_quotes(page_url):
         # Check for a link to the next page
         next_page = soup.find('li', class_='next')
         if next_page and next_page.find('a'):  # Ensure the next page link exists
-            next_page_url = base_url + next_page.find('a')['href']  # Construct the URL for the next page
-            quotes_data.extend(fetch_quotes(next_page_url))  # Recursively fetch quotes from the next page
+            # Build the next URL from the current page, so it works for any starting URL
+            page_url = urljoin(page_url, next_page.find('a')['href'])
+        else:
+            page_url = None  # No more pages: stop the loop
 
     return quotes_data  # Return the list of quotes and authors
 
 
 def csv_saving(data, filename):
     """
-    Save the scraped data to a CSV file.
+    Save the scraped data to a CSV file (sorted by author).
 
     Parameters:
     - data: List of dictionaries containing the scraped data
     - filename: Name of the CSV file to save
+
+    Returns:
+    - The sorted DataFrame that was saved
     """
-    quotes_data = fetch_quotes(base_url)
     df = pd.DataFrame(data)  # Convert the list of dictionaries into a pandas DataFrame
-    df_sorted = df.sort_values(by='Author').reset_index(drop=True)
+    if not df.empty:  # Sorting needs the 'Author' column, which is missing when nothing was scraped
+        df = df.sort_values(by='Author').reset_index(drop=True)
+
+    folder = os.path.dirname(filename)
+    if folder:  # Create the output folder (e.g. 'data/') if it does not exist yet
+        os.makedirs(folder, exist_ok=True)
+
     df.to_csv(filename, index=False)  # Save the DataFrame to a CSV file without row numbers
-    return df_sorted  # Return the sorted DataFrame
+    return df  # Return the sorted DataFrame
 
 # Start the scraping process from the first page of the site
 
