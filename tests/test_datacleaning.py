@@ -98,6 +98,25 @@ def test_clean_cars_removes_duplicates_after_harmonisation():
     assert len(clean_cars(df, current_year=2026)) == 1
 
 
+def test_clean_cars_keeps_one_row_per_id():
+    df = make_df([
+        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
+        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 9900],  # same car, the price changed
+        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],
+        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],  # no Id: only exact copies are removed
+    ])
+    df.insert(0, 'Id', [1036829, 1036829, None, None])
+    cleaned = clean_cars(df, current_year=2026)
+    assert len(cleaned) == 2
+    assert list(cleaned['Prix']) == [10000, 12000]  # the first copy is kept
+    assert cleaned.columns[0] == 'Id'
+
+
+def test_clean_cars_without_id_column_has_no_id_column():
+    cleaned = clean_cars(make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000]]), current_year=2026)
+    assert 'Id' not in cleaned.columns
+
+
 def test_clean_cars_removes_incomplete_and_impossible_rows():
     df = make_df([
         ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],  # valid

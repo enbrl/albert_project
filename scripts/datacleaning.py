@@ -95,6 +95,7 @@ def clean_cars(df, current_year=None):
 
     Parameters:
     - df: DataFrame with at least the columns Nom, Carburant, Boite de vitesse, Km, année, Prix
+      (and optionally 'Id', the number of the listing: a car with the same Id is kept once)
     - current_year: the latest accepted year (by default: next year)
 
     Returns:
@@ -106,7 +107,10 @@ def clean_cars(df, current_year=None):
     if current_year is None:
         current_year = datetime.date.today().year + 1  # a car of the next model year can be on sale
 
-    cleaned = df[COLUMNS].copy()
+    has_id = 'Id' in df.columns
+    cleaned = df[(['Id'] if has_id else []) + COLUMNS].copy()
+    if has_id:
+        cleaned['Id'] = pd.array(cleaned['Id'].map(to_number), dtype='Int64')
     cleaned['Nom'] = cleaned['Nom'].map(normalize_name)
     cleaned['Carburant'] = cleaned['Carburant'].map(normalize_fuel)
     cleaned['Boite de vitesse'] = cleaned['Boite de vitesse'].map(normalize_gearbox)
@@ -124,6 +128,8 @@ def clean_cars(df, current_year=None):
     ]
 
     cleaned = cleaned.astype({'Km': 'int64', 'année': 'int64', 'Prix': 'int64'})
+    if has_id:  # the same Id is the same car, even if it was scraped twice
+        cleaned = cleaned[cleaned['Id'].isna() | ~cleaned['Id'].duplicated()]
     cleaned = cleaned.drop_duplicates().reset_index(drop=True)
     cleaned['Marque'] = cleaned['Nom'].str.split().str[0]
     return cleaned
