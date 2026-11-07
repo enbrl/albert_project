@@ -26,9 +26,15 @@ COLUMNS = ['Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix']
 # Value used when the fuel or the gearbox is not given or not understood
 UNKNOWN = 'Inconnu'
 
+# Optional columns of the scraper: kept and cleaned when they are in the file
+ENGINE_COLUMNS = ['Motorisation', 'Finition']
+POWER_COLUMN = 'Puissance'
+
 # Limits used to remove impossible values (typos, test listings...)
 FIRST_YEAR = 1990
 MAX_KM = 1_000_000
+MIN_POWER = 30
+MAX_POWER = 1500
 
 
 def to_number(value):
@@ -52,6 +58,14 @@ def normalize_name(value):
         return None
     words = value.split()
     return ' '.join(w if (w.isupper() and len(w) <= 3) else w.capitalize() for w in words)
+
+
+def normalize_text(value):
+    """Remove the extra spaces of a text; an empty text becomes None."""
+    if not isinstance(value, str):
+        return None
+    text = ' '.join(value.split())
+    return text or None
 
 
 def normalize_fuel(value):
@@ -99,7 +113,9 @@ def clean_cars(df, current_year=None):
     - current_year: the latest accepted year (by default: next year)
 
     Returns:
-    - A new DataFrame with the same columns plus 'Marque' (the first word of the name)
+    - A new DataFrame with the same columns plus 'Marque' (the first word of the name).
+      The optional columns Motorisation, Finition and Puissance (the power in horsepower,
+      empty when it is not possible) are cleaned and kept when the input has them.
     """
     missing = [column for column in COLUMNS if column not in df.columns]
     if missing:
@@ -108,7 +124,8 @@ def clean_cars(df, current_year=None):
         current_year = datetime.date.today().year + 1  # a car of the next model year can be on sale
 
     has_id = 'Id' in df.columns
-    cleaned = df[(['Id'] if has_id else []) + COLUMNS].copy()
+    optional = [column for column in ENGINE_COLUMNS + [POWER_COLUMN] if column in df.columns]
+    cleaned = df[(['Id'] if has_id else []) + COLUMNS + optional].copy()
     if has_id:
         cleaned['Id'] = pd.array(cleaned['Id'].map(to_number), dtype='Int64')
     cleaned['Nom'] = cleaned['Nom'].map(normalize_name)
@@ -116,6 +133,14 @@ def clean_cars(df, current_year=None):
     cleaned['Boite de vitesse'] = cleaned['Boite de vitesse'].map(normalize_gearbox)
     for column in ('Km', 'année', 'Prix'):
         cleaned[column] = cleaned[column].map(to_number)
+
+    for column in ENGINE_COLUMNS:
+        if column in cleaned.columns:
+            cleaned[column] = cleaned[column].map(normalize_text)
+    if POWER_COLUMN in cleaned.columns:  # a power that is not possible is empty, the car is kept
+        power = cleaned[POWER_COLUMN].map(to_number)
+        power = power.where(power.between(MIN_POWER, MAX_POWER))
+        cleaned[POWER_COLUMN] = pd.array(power, dtype='Int64')
 
     # The model needs a name, a mileage, a year and a price
     cleaned = cleaned.dropna(subset=['Nom', 'Km', 'année', 'Prix'])

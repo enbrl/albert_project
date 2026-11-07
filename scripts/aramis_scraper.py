@@ -24,9 +24,12 @@ If the scraping stops, the message tells which command to run to continue:
     python -m scripts.aramis_scraper --all --start-page 57 --append --output data/cars_raw.csv
 
 The CSV has the columns of the notebook (Nom, Carburant, Boite de vitesse, Km,
-année, Prix) and the Id of the listing (the same car has the same Id every
-time, which removes the duplicates). Id, Km, année and Prix are integers
-(empty when not found).
+année, Prix), the Id of the listing (the same car has the same Id every time,
+which removes the duplicates) and the details of the engine: Motorisation
+(for example '1.2 PureTech 68 BVM5'), Finition (for example 'Like') and
+Puissance (power in horsepower, found in the text of the engine when it is
+written there). Id, Km, année, Prix and Puissance are integers (empty when not
+found).
 """
 
 import argparse
@@ -60,7 +63,12 @@ MAX_PAGES = 500
 
 HEADERS = {'User-Agent': 'albert_project (school project, scraping used-car listings politely)'}
 
-COLUMNS = ['Id', 'Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix']
+COLUMNS = ['Id', 'Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix', 'Motorisation', 'Finition', 'Puissance']
+INTEGER_COLUMNS = ['Id', 'Km', 'année', 'Prix', 'Puissance']
+
+# Power below and above these values is not a power (it is another number of the text)
+MIN_POWER = 30
+MAX_POWER = 1000
 
 
 class ScrapingStopped(Exception):
@@ -92,6 +100,39 @@ def _text(card, selector):
     return element.get_text(' ', strip=True) if element else None
 
 
+def parse_power(engine, name=''):
+    """
+    Find the power (in horsepower) in the text of the engine.
+
+    Examples: '1.2 PureTech 68 BVM5' -> 68, '2008 Hybrid 145 ch e-DCS6' -> 145,
+    '50 kWh - 136' -> 136, '75 kWh - RWD' -> None.
+
+    The number of the model (for example 2008 in 'Peugeot 2008'), the displacement
+    (1.2), the battery (50 kWh) and the codes stuck to letters (BVM5, 16V) are ignored.
+
+    Parameters:
+    - engine: text of the engine
+    - name: name of the car, to ignore the number of the model
+
+    Returns:
+    - The power as an integer, or None if it is not written
+    """
+    if not engine:
+        return None
+    text = re.sub(r'\b\d+[.,]\d+\b', ' ', engine)  # displacement: 1.2, 1,6
+    text = re.sub(r'\b\d+\s*kWh\b', ' ', text, flags=re.IGNORECASE)  # battery: 50 kWh
+    explicit = re.search(r'\b(\d{2,3})\s*ch\b', text, flags=re.IGNORECASE)  # '145 ch'
+    if explicit:
+        candidates = [explicit.group(1)]
+    else:
+        model_numbers = set(re.findall(r'\d+', name or ''))
+        candidates = [n for n in re.findall(r'(?<![\w.])(\d{2,3})(?![\w.])', text) if n not in model_numbers]
+    for candidate in candidates:
+        if MIN_POWER <= int(candidate) <= MAX_POWER:
+            return int(candidate)
+    return None
+
+
 def parse_id(card):
     """
     Return the Id of the listing, read in the link of the card (...?vehicleId=1036829), or None.
@@ -118,6 +159,11 @@ def parse_card(card):
     fuel = parts[1] if len(parts) > 1 and parts[1] else None
     gearbox = parts[2] if len(parts) > 2 and parts[2] else None
 
+    # Engine and trim look like "1.2 PureTech 68 BVM5 • Like"
+    engine_parts = [part.strip() for part in (_text(card, '.vehicle-properties__engine-trim') or '').split('•')]
+    engine = engine_parts[0] or None
+    trim = ' • '.join(part for part in engine_parts[1:] if part) or None
+
     return {
         'Id': parse_id(card),
         'Nom': name,
@@ -126,6 +172,9 @@ def parse_card(card):
         'Km': parse_number(_text(card, '.vehicle-properties__mileage')),
         'année': parse_number(parts[0]),
         'Prix': parse_number(_text(card, '.vehicle-card__selling-price')),
+        'Motorisation': engine,
+        'Finition': trim,
+        'Puissance': parse_power(engine, name),
     }
 
 
@@ -248,7 +297,7 @@ def save_listings(rows, filename):
     - The saved DataFrame
     """
     df = pd.DataFrame(rows, columns=COLUMNS)
-    df = df.astype({'Id': 'Int64', 'Km': 'Int64', 'année': 'Int64', 'Prix': 'Int64'})  # integers that can be empty
+    df = df.astype({column: 'Int64' for column in INTEGER_COLUMNS})  # integers that can be empty
     df = df[df['Id'].isna() | ~df['Id'].duplicated()]  # same Id = same car
 
     folder = os.path.dirname(filename)
@@ -269,10 +318,12 @@ def load_listings(filename):
         for column, value in record.items():
             if pd.isna(value):
                 row[column] = None  # empty value
-            elif column in ('Id', 'Km', 'année', 'Prix'):
+            elif column in INTEGER_COLUMNS:
                 row[column] = int(value)
             else:
                 row[column] = value
+        for column in COLUMNS:  # a file made by an older version has fewer columns
+            row.setdefault(column, None)
         rows.append(row)
     return rows
 

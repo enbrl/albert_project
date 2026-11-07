@@ -17,6 +17,7 @@ from scripts.aramis_scraper import (
     make_session,
     parse_listing_page,
     parse_number,
+    parse_power,
     save_listings,
     scrape_listings,
 )
@@ -86,11 +87,40 @@ def test_parse_listing_page_extracts_the_vehicles():
         'Km': 94410,
         'année': 2017,
         'Prix': 6999,
+        'Motorisation': '1.2 PureTech 68 BVM5',
+        'Finition': 'Like',
+        'Puissance': 68,
     }
 
 
 def test_parse_listing_page_reads_the_id_of_the_listing():
     assert [row['Id'] for row in parse_listing_page(FIXTURE)] == [1036829, 1036830, None]
+
+
+@pytest.mark.parametrize('engine, name, expected', [
+    ('1.2 PureTech 68 BVM5', 'Peugeot 208', 68),  # displacement and gearbox code ignored
+    ('1.5 dCi 100 BVM6', 'Renault Clio', 100),
+    ('2008 Hybrid 145 ch e-DCS6', 'Peugeot 2008', 145),  # explicit 'ch'
+    ('Hybrid 145 e-DCS6', 'Peugeot 3008', 145),
+    ('1.5 L Hybrid+ 197 ch', 'MG ZS', 197),
+    ('BlueHDi 130ch S&S EAT8', 'Peugeot 308', 130),  # 'ch' stuck to the number
+    ('1.6 HDI 16V 92', 'Citroen C4', 92),  # 16V is a code, not a power
+    ('50 kWh - 136', 'Peugeot 2008', 136),  # battery ignored
+    ('75 kWh - RWD', 'Tesla Model 3', None),  # no power written
+    ('208 1.2 PureTech', 'Peugeot 208', None),  # 208 is the model, not a power
+    ('PureTech 5', 'Peugeot 208', None),  # one digit
+    ('', 'Peugeot 208', None),
+    (None, 'Peugeot 208', None),
+])
+def test_parse_power(engine, name, expected):
+    assert parse_power(engine, name) == expected
+
+
+def test_parse_power_ignores_impossible_values():
+    assert parse_power('Moteur 12') is None
+    assert parse_power('Moteur 2500') is None  # four digits
+    assert parse_power('Type 999 Special') == 999
+    assert parse_power('Type 20') is None  # below MIN_POWER
 
 
 def test_parse_listing_page_electric_car_keeps_gearbox():
@@ -99,6 +129,9 @@ def test_parse_listing_page_electric_car_keeps_gearbox():
     assert electric['Boite de vitesse'] == 'Auto.'
     assert electric['année'] == 2020
     assert electric['Prix'] == 16999
+    assert electric['Motorisation'] == '50 kWh - 136'
+    assert electric['Finition'] == 'GT-Line'
+    assert electric['Puissance'] == 136
 
 
 def test_parse_listing_page_missing_fields_are_none():
@@ -108,6 +141,9 @@ def test_parse_listing_page_missing_fields_are_none():
     assert incomplete['Km'] is None
     assert incomplete['année'] is None
     assert incomplete['Carburant'] is None
+    assert incomplete['Motorisation'] is None
+    assert incomplete['Finition'] is None
+    assert incomplete['Puissance'] is None
 
 
 def test_parse_listing_page_without_vehicle():
@@ -286,6 +322,15 @@ def test_load_listings_gives_back_what_was_saved(tmp_path):
     destination = str(tmp_path / 'cars.csv')
     save_listings(rows, destination)
     assert load_listings(destination) == rows
+
+
+def test_load_listings_of_a_file_made_by_an_older_version(tmp_path):
+    destination = tmp_path / 'old.csv'
+    pd.DataFrame([{'Id': 1, 'Nom': 'Peugeot 208', 'Carburant': 'Essence', 'Boite de vitesse': 'Manuelle',
+                   'Km': 1000, 'année': 2020, 'Prix': 9000}]).to_csv(destination, index=False)
+    row = load_listings(str(destination))[0]
+    assert row['Puissance'] is None and row['Motorisation'] is None and row['Finition'] is None
+    assert row['Prix'] == 9000
 
 
 def test_load_listings_of_a_missing_file(tmp_path):

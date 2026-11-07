@@ -10,6 +10,7 @@ from scripts.datacleaning import (
     normalize_fuel,
     normalize_gearbox,
     normalize_name,
+    normalize_text,
     to_number,
 )
 
@@ -115,6 +116,39 @@ def test_clean_cars_keeps_one_row_per_id():
 def test_clean_cars_without_id_column_has_no_id_column():
     cleaned = clean_cars(make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000]]), current_year=2026)
     assert 'Id' not in cleaned.columns
+
+
+def test_clean_cars_cleans_the_engine_columns_when_present():
+    df = make_df([
+        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
+        ['Peugeot 208', 'Essence', 'Manuelle', 51000, 2019, 10100],
+        ['Peugeot 208', 'Essence', 'Manuelle', 52000, 2019, 10200],
+        ['Peugeot 208', 'Essence', 'Manuelle', 53000, 2019, 10300],
+    ])
+    df['Motorisation'] = ['  1.2   PureTech 68 ', '', None, '50 kWh - 136']
+    df['Finition'] = ['Like', 'GT  Line', None, ' ']
+    df['Puissance'] = [68, '110 ch', 5, 99999]  # 5 and 99999 are not possible powers
+    cleaned = clean_cars(df, current_year=2026)
+    assert len(cleaned) == 4  # an impossible power does not remove the car
+    # An empty text is None or NaN depending on the version of pandas: only "empty or not" matters
+    assert cleaned['Motorisation'].isna().tolist() == [False, True, True, False]
+    assert cleaned['Motorisation'][[0, 3]].tolist() == ['1.2 PureTech 68', '50 kWh - 136']
+    assert cleaned['Finition'].isna().tolist() == [False, False, True, True]
+    assert cleaned['Finition'][[0, 1]].tolist() == ['Like', 'GT Line']
+    assert cleaned['Puissance'].tolist()[:2] == [68, 110]
+    assert cleaned['Puissance'].isna().tolist() == [False, False, True, True]
+
+
+def test_clean_cars_without_engine_columns_has_no_engine_columns():
+    cleaned = clean_cars(make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000]]), current_year=2026)
+    assert not {'Motorisation', 'Finition', 'Puissance'} & set(cleaned.columns)
+
+
+def test_normalize_text():
+    assert normalize_text('  GT   Line ') == 'GT Line'
+    assert normalize_text('   ') is None
+    assert normalize_text(None) is None
+    assert normalize_text(float('nan')) is None
 
 
 def test_clean_cars_removes_incomplete_and_impossible_rows():
