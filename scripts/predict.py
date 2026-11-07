@@ -13,9 +13,11 @@ and 'Peugeot 208' are the same car, and 'Auto.' means 'Automatique'.
 """
 
 import argparse
+import datetime
 
 from scripts.analysis import euros
-from scripts.datacleaning import normalize_fuel, normalize_gearbox, normalize_name
+from scripts.cli import run
+from scripts.datacleaning import FIRST_YEAR, normalize_fuel, normalize_gearbox, normalize_name
 from scripts.models import DEFAULT_MODEL_PATH, load_model, predict_price
 
 
@@ -34,6 +36,11 @@ def main(argv=None):
         parser.error('--km must be positive')
     if args.power is not None and args.power <= 0:
         parser.error('--power must be positive')
+    last_year = datetime.date.today().year + 1
+    if not FIRST_YEAR <= args.year <= last_year:
+        parser.error(f'--year must be between {FIRST_YEAR} and {last_year}')
+    if not args.name.strip():
+        parser.error('--name must not be empty')
 
     try:
         model = load_model(args.model)
@@ -58,4 +65,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    run(main)

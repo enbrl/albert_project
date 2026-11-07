@@ -42,6 +42,8 @@ from sklearn.model_selection import KFold, cross_validate, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
+from scripts.cli import UserError, run
+
 CATEGORICAL_FEATURES = ['Marque', 'Nom', 'Carburant', 'Boite de vitesse']
 NUMERIC_FEATURES = ['Km', 'année']
 OPTIONAL_NUMERIC_FEATURES = ['Puissance']  # used only when the data has it (and enough of it)
@@ -83,7 +85,7 @@ def prepare_features(df, columns=None):
     columns = columns if columns is not None else feature_columns(features)
     missing = [column for column in columns if column not in features.columns]
     if missing:
-        raise ValueError(f'Missing columns: {missing}')
+        raise UserError(f'Missing columns: {missing}')
     return features[columns]
 
 
@@ -133,7 +135,7 @@ def build_model(kind=DEFAULT_KIND, random_state=42, columns=None):
 
 def _check_size(df):
     if len(df) < MIN_ROWS:
-        raise ValueError(f'At least {MIN_ROWS} cars are needed, got {len(df)}')
+        raise UserError(f'At least {MIN_ROWS} cars are needed to train a model, got {len(df)}')
 
 
 def compare_models(df, kinds=MODEL_KINDS, n_splits=5, random_state=42):
@@ -317,4 +319,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    run(main)
