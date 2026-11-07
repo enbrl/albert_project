@@ -5,6 +5,9 @@ Usage (from the root of the project), after training the model with
 
     python -m scripts.predict --name "Peugeot 208" --fuel Essence --gearbox Manuelle --km 60000 --year 2019
 
+The power in horsepower is optional (``--power 100``): it makes the estimate more precise when the
+model was trained with it (the power is the column that matters most for the price).
+
 The labels are cleaned like in scripts/datacleaning.py: 'PEUGEOT 208', 'peugeot 208'
 and 'Peugeot 208' are the same car, and 'Auto.' means 'Automatique'.
 """
@@ -23,16 +26,23 @@ def main(argv=None):
     parser.add_argument('--gearbox', required=True, help='Manuelle or Automatique')
     parser.add_argument('--km', required=True, type=int, help='mileage in km')
     parser.add_argument('--year', required=True, type=int, help='year of the first registration')
+    parser.add_argument('--power', type=int, help='power in horsepower (optional, used if the model knows the power)')
     parser.add_argument('--model', default=DEFAULT_MODEL_PATH, help=f'trained model (default: {DEFAULT_MODEL_PATH})')
     args = parser.parse_args(argv)
 
     if args.km < 0:
         parser.error('--km must be positive')
+    if args.power is not None and args.power <= 0:
+        parser.error('--power must be positive')
 
     try:
         model = load_model(args.model)
     except FileNotFoundError:
         parser.exit(1, f'No model in {args.model}. Train it first: python -m scripts.models data/cars_clean.csv\n')
+    except Exception as error:  # whatever the reason, a file that cannot be read is reported the same way
+        # A model file can only be read with the version of scikit-learn that made it (or the file is broken)
+        parser.exit(1, f'The model in {args.model} cannot be read ({type(error).__name__}). It was probably saved with '
+                       'another version of scikit-learn: train it again with python -m scripts.models data/cars_clean.csv\n')
 
     price = predict_price(
         model,
@@ -41,6 +51,7 @@ def main(argv=None):
         normalize_gearbox(args.gearbox),
         args.km,
         args.year,
+        power=args.power,
     )
     print(f'Estimated price: {euros(price)}')
     return price
