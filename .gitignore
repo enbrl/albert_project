@@ -19,3 +19,7 @@ data/*
 # Trained models
 *.joblib
 reports/
+
+# Test coverage (pytest --cov)
+.coverage
+htmlcov/

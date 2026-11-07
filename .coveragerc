@@ -1,0 +1,12 @@
+# Which part of the code the tests run (pytest-cov). Use: python -m pytest --cov
+[run]
+source = scripts
+
+[report]
+# The CI fails (and so does `pytest --cov`) if less than this share of the lines is run by the tests
+fail_under = 95
+show_missing = true
+skip_empty = true
+# The line that starts a script from a terminal is not run by the tests (they call main() directly)
+exclude_also =
+    if __name__ == .__main__.:

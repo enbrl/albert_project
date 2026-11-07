@@ -127,9 +127,10 @@ Download the files in the `data/` folder. They are not stored in the repository 
 ## Tests
 ```bash
 python -m pytest              # the tests, without the network
+python -m pytest --cov        # the same, and how much of the code they run (at least 95 %)
 python -m pytest -m live      # check the real website (3 requests)
 ```
-The first command also runs on GitHub (Actions) for every pull request and every push on `main`. The second one runs every Monday.
+The first two commands also run on GitHub (Actions) for every pull request and every push on `main`: the pull request fails if the tests run less than 95 % of the code of `scripts/`. The third one runs every Monday.
 
 ## Development
 Install the automatic checks once:
