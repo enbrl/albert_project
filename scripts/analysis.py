@@ -18,6 +18,8 @@ import os
 import pandas as pd
 from matplotlib.figure import Figure
 
+from scripts.cli import UserError, run
+
 # Brands (or models) with fewer cars are left out of the averages: 2 cars say nothing
 MIN_CARS = 5
 
@@ -241,7 +243,7 @@ def make_report(df, folder):
     - The path of report.html
     """
     if df.empty:
-        raise ValueError('There is no car to analyse')
+        raise UserError('There is no car to analyse')
     os.makedirs(folder, exist_ok=True)
     for name, _, plot in CHARTS:
         plot(df, os.path.join(folder, name))
@@ -258,6 +260,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     df = pd.read_csv(args.data)
+    if df.empty:
+        raise UserError(f'There is no car in {args.data}')
     stats = summary(df)
     print(f"{stats['cars']} cars, median price {euros(stats['price_median'])}, "
           f"years {stats['year_min']} to {stats['year_max']}")
@@ -268,4 +272,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    run(main)

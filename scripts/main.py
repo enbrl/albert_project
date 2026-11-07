@@ -6,7 +6,8 @@
 #    python -m scripts.main --url https://quotes.toscrape.com/page/5/ --output data/page5.csv
 import argparse
 
-from scripts.datasourcing import base_url, fetch_quotes, csv_saving
+from scripts.cli import run
+from scripts.datasourcing import base_url, csv_saving, fetch_quotes
 
 DEFAULT_OUTPUT = 'data/quotes_script.csv'
 
@@ -23,4 +24,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    print(main())
+    run(main, print_result=True)

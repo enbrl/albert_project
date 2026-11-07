@@ -44,6 +44,8 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from scripts.cli import UserError, positive_int, run
+
 # Listing of used cars. The page number is given with the "page" parameter.
 LISTING_URL = 'https://www.aramisauto.com/voitures/occasion/'
 
@@ -330,9 +332,9 @@ def load_listings(filename):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Scrape used-car listings from aramisauto.com')
-    parser.add_argument('--pages', type=int, default=5, help='number of pages to scrape (default: 5)')
+    parser.add_argument('--pages', type=positive_int, default=5, help='number of pages to scrape (default: 5)')
     parser.add_argument('--all', action='store_true', help='scrape all the pages, until the end of the listing')
-    parser.add_argument('--start-page', type=int, default=1, help='first page to scrape (default: 1)')
+    parser.add_argument('--start-page', type=positive_int, default=1, help='first page to scrape (default: 1)')
     parser.add_argument('--append', action='store_true', help='add to the output file instead of replacing it')
     parser.add_argument('--output', default='data/cars_raw.csv', help='CSV file to write (default: data/cars_raw.csv)')
     args = parser.parse_args(argv)
@@ -358,10 +360,13 @@ def main(argv=None):
               f'--output {args.output}', file=sys.stderr)
         raise SystemExit(1) from error
 
-    df = save_listings(saved['rows'], args.output)  # also creates the file when no vehicle was found
+    if not saved['rows']:  # never replace a good file by an empty one
+        raise UserError('No vehicle was found: the website probably changed its pages. '
+                        f'{args.output} was not changed.')
+    df = save_listings(saved['rows'], args.output)
     print(f'{len(df)} vehicles saved in {args.output}')
     return df
 
 
 if __name__ == '__main__':
-    main()
+    run(main)

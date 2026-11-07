@@ -21,6 +21,8 @@ import re
 
 import pandas as pd
 
+from scripts.cli import UserError, run
+
 COLUMNS = ['Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Prix']
 
 # Value used when the fuel or the gearbox is not given or not understood
@@ -119,7 +121,7 @@ def clean_cars(df, current_year=None):
     """
     missing = [column for column in COLUMNS if column not in df.columns]
     if missing:
-        raise ValueError(f'Missing columns: {missing}')
+        raise UserError(f'Missing columns: {missing}')
     if current_year is None:
         current_year = datetime.date.today().year + 1  # a car of the next model year can be on sale
 
@@ -178,4 +180,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    main()
+    run(main)
