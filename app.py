@@ -102,9 +102,9 @@ if submitted:
         st.stop()
     price = estimate(model, name, fuel, gearbox, int(km), int(year), int(power))
     st.metric('Estimated price', euros(round(price, -2)))
-    error = typical_error(model_path)
-    if error:
-        st.caption(f'On cars it had not seen, this model is wrong by {euros(round(error, -1))} on average.')
+    mean_error = typical_error(model_path)
+    if mean_error:
+        st.caption(f'On cars it had not seen, this model is wrong by {euros(round(mean_error, -1))} on average.')
 
     summary = market_summary(cars, name)
     if summary:
