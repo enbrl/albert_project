@@ -154,8 +154,10 @@ def test_clean_cars_cleans_the_engine_columns_when_present():
     assert cleaned['Motorisation'][[0, 3]].tolist() == ['1.2 PureTech 68', '50 kWh - 136']
     assert cleaned['Finition'].isna().tolist() == [False, False, True, True]
     assert cleaned['Finition'][[0, 1]].tolist() == ['Like', 'GT Line']
-    assert cleaned['Puissance'].tolist()[:2] == [68, 110]
-    assert cleaned['Puissance'].isna().tolist() == [False, False, True, True]
+    # The power is read again from the text of the engine when there is one: '50 kWh - 136' gives 136, whatever was stored (99999)
+    assert cleaned['Puissance'].tolist()[:2] == [68, 110]  # row 2 has no text of engine: the stored '110 ch' is kept
+    assert cleaned['Puissance'].isna().tolist() == [False, False, True, False]
+    assert cleaned['Puissance'][3] == 136
 
 
 def test_clean_cars_without_engine_columns_has_no_engine_columns():
@@ -354,3 +356,54 @@ def test_main_prints_what_was_removed(tmp_path, capsys):
     output = capsys.readouterr().out
     assert '2 rows read' in output and '1 rows kept' in output
     assert 'removed: impossible values' in output and 'Saved in' in output
+
+
+# ---------------------------------------------------------------- the power is read again from the engine
+
+
+def power_df(rows):
+    """Cars with an engine text and the power that an older scraper stored."""
+    df = make_df([[name, 'Essence', 'Manuelle', 20000 + i, 2021, 25000 + i] for i, (name, _, _) in enumerate(rows)])
+    df['Motorisation'] = [engine for _, engine, _ in rows]
+    df['Puissance'] = [stored for _, _, stored in rows]
+    return df
+
+
+def test_the_power_of_an_audi_is_repaired_from_the_text_of_the_engine():
+    # the first scraper stored the power class (40, 35, 55) instead of the horsepower
+    df = power_df(
+        [
+            ('Audi A3 Sportback', '40 TFSIe 204 S tronic 6', 40),
+            ('Audi Q2', '35 TDI 150 S tronic 7', 35),
+            ('Audi Q7', '55 TFSI 340 Tiptronic 8 Quattro 5pl', 55),
+            ('Peugeot 208', '1.2 PureTech 68 BVM5', 68),
+        ]
+    )
+    cleaned = clean_cars(df, current_year=2026)
+    assert cleaned['Puissance'].tolist() == [204, 150, 340, 68]
+
+
+def test_the_power_of_a_hybrid_is_the_engine_not_the_electric_motor():
+    df = power_df([('Volvo V60', '2.0 T8 Twin Engine 303 + 87 ch Geartronic 8', 87)])
+    assert clean_cars(df, current_year=2026)['Puissance'].tolist() == [303]
+
+
+def test_the_stored_power_is_kept_when_there_is_no_text_of_the_engine():
+    df = power_df([('Peugeot 208', None, 68), ('Renault Clio', '', 90), ('Opel Astra', 'Moteur sans puissance', 110)])
+    cleaned = clean_cars(df, current_year=2026)
+    # no text: the stored value stays; a text with no power written: the power is empty (nothing was written)
+    assert cleaned['Puissance'].isna().tolist() == [False, False, True]
+    assert cleaned['Puissance'][:2].tolist() == [68, 90]
+
+
+def test_the_power_column_is_created_when_the_file_has_only_the_text_of_the_engine():
+    df = make_df([['Peugeot 208', 'Essence', 'Manuelle', 20000, 2021, 25000]])
+    df['Motorisation'] = ['1.2 PureTech 110 BVM6']
+    cleaned = clean_cars(df, current_year=2026)
+    assert cleaned['Puissance'].tolist() == [110]
+
+
+def test_a_file_without_engine_text_keeps_its_power_column():
+    df = make_df([['Peugeot 208', 'Essence', 'Manuelle', 20000, 2021, 25000]])
+    df['Puissance'] = [68]
+    assert clean_cars(df, current_year=2026)['Puissance'].tolist() == [68]

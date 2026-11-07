@@ -102,15 +102,24 @@ def _text(card, selector):
     return element.get_text(' ', strip=True) if element else None
 
 
+# Audi (and its group) write a power CLASS before the horsepower: '40 TFSIe 204', '35 TDI 150'. The 40 and the 35 are not horsepower.
+POWER_CLASS = re.compile(r'(?<![\w.])\d{2,3}(?=\s*(?:TFSI\s*e|TFSI|TDI|TSI|g-tron|e-tron)\b)', re.IGNORECASE)
+
+# A hybrid writes its engine and its electric motor: '253 + 145', '303 + 87 ch'. The power kept is the engine, the first number.
+HYBRID_SUM = re.compile(r'(?<![\w.])(\d{2,3})\s*\+\s*(\d{2,3})(?![\w.])')
+
+
 def parse_power(engine, name=''):
     """
     Find the power (in horsepower) in the text of the engine.
 
     Examples: '1.2 PureTech 68 BVM5' -> 68, '2008 Hybrid 145 ch e-DCS6' -> 145,
-    '50 kWh - 136' -> 136, '75 kWh - RWD' -> None.
+    '50 kWh - 136' -> 136, '75 kWh - RWD' -> None, '40 TFSIe 204 S tronic 6' -> 204,
+    '2.0 T8 Twin Engine 303 + 87 ch' -> 303.
 
     The number of the model (for example 2008 in 'Peugeot 2008'), the displacement
-    (1.2), the battery (50 kWh) and the codes stuck to letters (BVM5, 16V) are ignored.
+    (1.2), the battery (50 kWh), the power class of Audi (the 40 of '40 TFSIe') and the codes
+    stuck to letters (BVM5, 16V) are ignored. For a hybrid ('253 + 145') the engine is kept.
 
     Parameters:
     - engine: text of the engine
@@ -123,12 +132,18 @@ def parse_power(engine, name=''):
         return None
     text = re.sub(r'\b\d+[.,]\d+\b', ' ', engine)  # displacement: 1.2, 1,6
     text = re.sub(r'\b\d+\s*kWh\b', ' ', text, flags=re.IGNORECASE)  # battery: 50 kWh
+    text = POWER_CLASS.sub(' ', text)  # Audi: '40 TFSIe 204' -> ' TFSIe 204'
+    hybrid = HYBRID_SUM.search(text)
     explicit = re.search(r'\b(\d{2,3})\s*ch\b', text, flags=re.IGNORECASE)  # '145 ch'
-    if explicit:
+    if hybrid:
+        candidates = [hybrid.group(1)]
+    elif explicit:
         candidates = [explicit.group(1)]
     else:
         model_numbers = set(re.findall(r'\d+', name or ''))
-        candidates = [n for n in re.findall(r'(?<![\w.])(\d{2,3})(?![\w.])', text) if n not in model_numbers]
+        # a number alone, or stuck to 'S tronic' ('150S tronic 7')
+        numbers = re.findall(r'(?<![\w.])(\d{2,3})(?:(?=S\s?tronic)|(?![\w.]))', text)
+        candidates = [n for n in numbers if n not in model_numbers]
     for candidate in candidates:
         if MIN_POWER <= int(candidate) <= MAX_POWER:
             return int(candidate)

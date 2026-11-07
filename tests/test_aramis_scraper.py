@@ -113,6 +113,23 @@ def test_parse_listing_page_reads_the_id_of_the_listing():
         ('75 kWh - RWD', 'Tesla Model 3', None),  # no power written
         ('208 1.2 PureTech', 'Peugeot 208', None),  # 208 is the model, not a power
         ('PureTech 5', 'Peugeot 208', None),  # one digit
+        # Audi writes a power class before the horsepower: the 40 of '40 TFSIe' is not horsepower
+        ('40 TFSIe 204 S tronic 6', 'Audi A3 Sportback', 204),
+        ('35 TDI 150 S tronic 7', 'Audi Q2', 150),
+        ('55 TFSI 340 Tiptronic 8 Quattro 5pl', 'Audi Q7', 340),
+        ('35 TFSI 150S tronic 7', 'Audi Q2', 150),  # 'S tronic' stuck to the number
+        ('35 TFSI CoD 150', 'Audi A3', 150),
+        ('45 TFSI e 245 S tronic 6', 'Audi Q3', 245),
+        # a hybrid writes its engine and its electric motor: the engine is kept
+        ('2.0 T8 Twin Engine 303 + 87 ch Geartronic 8', 'Volvo V60', 303),
+        ('T6 Hybride Rechargeable 253 + 145 AWD Geartronic 8', 'Volvo XC60', 253),
+        ('1.5 T5 Recharge 180+82 DCT7', 'Volvo XC40', 180),
+        ('Cooper SE 125 + 95 ALL4 BVA6', 'Mini Mini', 125),
+        # what already worked must not change
+        ('2.0 ECOBLUE 105 BVM6 280 L1H1', 'Ford Transit', 105),  # 280 is the model of the van
+        ('1.5 TSI 150 DSG7', 'Volkswagen Golf', 150),  # Volkswagen writes the displacement first
+        ('2.0 TDI 150 DSG7', 'Volkswagen Passat', 150),
+        ('1.5 L Hybrid+ 197 ch', 'MG ZS', 197),
         ('', 'Peugeot 208', None),
         (None, 'Peugeot 208', None),
     ],
