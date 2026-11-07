@@ -13,7 +13,6 @@ and 'Peugeot 208' are the same car, and 'Auto.' means 'Automatique'.
 """
 
 import argparse
-import pickle
 
 from scripts.analysis import euros
 from scripts.datacleaning import normalize_fuel, normalize_gearbox, normalize_name
@@ -40,8 +39,8 @@ def main(argv=None):
         model = load_model(args.model)
     except FileNotFoundError:
         parser.exit(1, f'No model in {args.model}. Train it first: python -m scripts.models data/cars_clean.csv\n')
-    except (AttributeError, ImportError, ValueError, EOFError, pickle.UnpicklingError) as error:
-        # A model file can only be read with the version of scikit-learn that made it
+    except Exception as error:  # whatever the reason, a file that cannot be read is reported the same way
+        # A model file can only be read with the version of scikit-learn that made it (or the file is broken)
         parser.exit(1, f'The model in {args.model} cannot be read ({type(error).__name__}). It was probably saved with '
                        'another version of scikit-learn: train it again with python -m scripts.models data/cars_clean.csv\n')
 
