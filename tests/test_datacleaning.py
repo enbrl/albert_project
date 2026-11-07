@@ -6,12 +6,16 @@ from scripts.datacleaning import (
     COLUMNS,
     UNKNOWN,
     clean_cars,
+    clean_cars_with_report,
+    format_report,
     main,
     normalize_fuel,
     normalize_gearbox,
     normalize_name,
     normalize_text,
+    split_brand,
     to_number,
+    without_accents,
 )
 
 
@@ -37,7 +41,7 @@ def test_to_number_without_value():
 
 def test_normalize_name():
     assert normalize_name('  PEUGEOT   308 ') == 'Peugeot 308'
-    assert normalize_name('Citroen C4') == 'Citroen C4'
+    assert normalize_name('Citroen C4') == 'Citroën C4'  # the brand is written like on the website
     assert normalize_name('MG ZS') == 'MG ZS'
     assert normalize_name('MINI MINI') == 'Mini Mini'
     assert normalize_name('') is None
@@ -85,8 +89,8 @@ def test_clean_cars_harmonises_the_messy_rows_of_the_notebooks():
     assert list(cleaned['Prix']) == [19999, 18690, 11690]
     assert list(cleaned['année']) == [2022, 2021, 2016]
     assert list(cleaned['Boite de vitesse']) == ['Manuelle', 'Automatique', 'Automatique']
-    assert list(cleaned['Nom']) == ['Opel Astra', 'Citroen C4', 'Renault Captur']
-    assert list(cleaned['Marque']) == ['Opel', 'Citroen', 'Renault']
+    assert list(cleaned['Nom']) == ['Opel Astra', 'Citroën C4', 'Renault Captur']
+    assert list(cleaned['Marque']) == ['Opel', 'Citroën', 'Renault']
     for column in ('Km', 'année', 'Prix'):
         assert cleaned[column].dtype == 'int64'
 
@@ -202,3 +206,110 @@ def test_main_merges_files_and_creates_the_output_folder(tmp_path):
     saved = pd.read_csv(destination)
     assert sorted(saved['Nom']) == ['Peugeot 208', 'Renault Clio']
     assert 'Marque' in saved.columns
+
+
+# ---------------------------------------------------------------- brands
+
+def test_without_accents():
+    assert without_accents('Citroën') == 'Citroen'
+    assert without_accents('Škoda Électrique') == 'Skoda Electrique'
+    assert without_accents('Peugeot 208') == 'Peugeot 208'
+
+
+@pytest.mark.parametrize('name, expected', [
+    ('Alfa Romeo Tonale', ('Alfa Romeo', 'Tonale')),
+    ('Land Rover Defender 110', ('Land Rover', 'Defender 110')),
+    ('Aston Martin Vantage', ('Aston Martin', 'Vantage')),
+    ('Rolls Royce Ghost', ('Rolls-Royce', 'Ghost')),
+    ('Mercedes-Benz GLA', ('Mercedes', 'GLA')),
+    ('Mercedes Benz Classe A', ('Mercedes', 'Classe A')),
+    ('Mercedes Classe A', ('Mercedes', 'Classe A')),
+    ('Lynk&co 01', ('Lynk & Co', '01')),
+    ('Lynk & Co 01', ('Lynk & Co', '01')),
+    ('Citroen C4', ('Citroën', 'C4')),
+    ('Citroën C4', ('Citroën', 'C4')),
+    ('Peugeot 208', ('Peugeot', '208')),  # by default the brand is the first word
+    ('MG ZS', ('MG', 'ZS')),
+    ('Tesla', ('Tesla', '')),
+    ('', ('', '')),
+])
+def test_split_brand(name, expected):
+    assert split_brand(name) == expected
+
+
+@pytest.mark.parametrize('raw, expected', [
+    ('ALFA ROMEO GIULIA', 'Alfa Romeo Giulia'),
+    ('citroen c3', 'Citroën C3'),
+    ('CITROËN C3', 'Citroën C3'),
+    ('Mercedes-Benz GLA', 'Mercedes GLA'),
+    ('lynk&co 01', 'Lynk & Co 01'),
+])
+def test_normalize_name_writes_the_brand_in_one_way(raw, expected):
+    assert normalize_name(raw) == expected
+
+
+def test_clean_cars_brand_of_a_two_word_brand():
+    df = make_df([['ALFA ROMEO Tonale', 'Essence', 'Manuelle', 20000, 2021, 25000]])
+    cleaned = clean_cars(df, current_year=2026)
+    assert cleaned.loc[0, 'Nom'] == 'Alfa Romeo Tonale'
+    assert cleaned.loc[0, 'Marque'] == 'Alfa Romeo'  # not 'Alfa'
+
+
+def test_clean_cars_merges_a_legacy_file_with_the_website_spelling():
+    legacy = make_df([['Citroen C4', 'Diesel', 'Manuelle', '57 844 km', '2021', '18 690 €']])
+    website = make_df([['Citroën C4', 'Diesel', 'Manuelle', 57844, 2021, 18690],  # the same car
+                       ['Citroën C3', 'Essence', 'Manuelle', 30000, 2022, 14000]])
+    cleaned = clean_cars(pd.concat([legacy, website], ignore_index=True), current_year=2026)
+    assert sorted(cleaned['Nom']) == ['Citroën C3', 'Citroën C4']  # one C4 only
+    assert set(cleaned['Marque']) == {'Citroën'}  # one brand, not two
+
+
+# ---------------------------------------------------------------- the report
+
+def test_clean_cars_with_report_counts_every_removed_row():
+    df = make_df([
+        ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],  # kept
+        [None, 'Essence', 'Manuelle', 50000, 2019, 10000],  # no name
+        ['Peugeot 208', 'Essence', 'Manuelle', None, 2019, 10100],  # no mileage
+        ['Peugeot 208', 'Essence', 'Manuelle', 50003, 1850, 10200],  # impossible year
+        ['Peugeot 208', 'Essence', 'Manuelle', 50004, 2019, 0],  # impossible price
+        ['PEUGEOT 208', 'Essence', 'Manuelle', '50 000 km', 2019, '10 000 €'],  # same as the first one
+        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 12000],  # kept, id 7
+        ['Renault Clio', 'Diesel', 'Manuelle', 30000, 2021, 11900],  # same id 7, another price
+    ])
+    df.insert(0, 'Id', [None, None, None, None, None, None, 7, 7])
+    cleaned, report = clean_cars_with_report(df, current_year=2026)
+    assert report == {'read': 8, 'missing': 2, 'impossible': 2, 'same_id': 1, 'duplicates': 1, 'kept': 2}
+    assert len(cleaned) == 2
+
+
+def test_the_report_adds_up():
+    df = make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000 + i, 2019 if i % 3 else 1800, 10000 if i % 4 else None]
+                  for i in range(40)])
+    _, report = clean_cars_with_report(df, current_year=2026)
+    removed = report['missing'] + report['impossible'] + report['same_id'] + report['duplicates']
+    assert report['read'] == removed + report['kept'] == 40
+
+
+def test_clean_cars_still_returns_only_the_table():
+    df = make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000]])
+    assert isinstance(clean_cars(df, current_year=2026), pd.DataFrame)
+
+
+def test_format_report():
+    text = format_report({'read': 100, 'missing': 3, 'impossible': 4, 'same_id': 5, 'duplicates': 6, 'kept': 82})
+    lines = text.split('\n')
+    assert lines[0] == '100 rows read'
+    assert lines[-1] == '82 rows kept'
+    assert 'removed: no name, mileage, year or price' in lines[1] and lines[1].strip().startswith('3')
+    assert len(lines) == 6
+
+
+def test_main_prints_what_was_removed(tmp_path, capsys):
+    source = tmp_path / 'raw.csv'
+    make_df([['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 10000],
+             ['Peugeot 208', 'Essence', 'Manuelle', 50000, 2019, 0]]).to_csv(source, index=False)
+    main([str(source), '-o', str(tmp_path / 'clean.csv')])
+    output = capsys.readouterr().out
+    assert '2 rows read' in output and '1 rows kept' in output
+    assert 'removed: impossible values' in output and 'Saved in' in output
