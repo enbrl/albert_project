@@ -7,7 +7,7 @@ The figures below were **measured on 2026-11-07** on the data scraped that day; 
 
 The model estimates the **asking price of a used car** from its brand and model, fuel, gearbox, mileage, year and (when it
 is written in the listing) power and, for an electric car, battery capacity. It was trained on the **2693 cars of the whole aramisauto.com used-car listing**.
-Measured on cars it had not seen (5-fold cross-validation), it is wrong by **1 436 € on average, 7.2 % of the
+Measured on cars it had not seen (5-fold cross-validation), it is wrong by **1 390 € on average, 7.0 % of the
 price**. Always answering the average price would be wrong by 5 193 € (30.8 %). It is a **learning project**, not a valuation tool.
 
 ## Intended use
@@ -46,16 +46,18 @@ Read the terms of use of the website before publishing the data.
 
 | Model | Mean error | % of the price | R² |
 |---|---:|---:|---:|
-| **boosting** (gradient boosting, kept) | **1 436 €** | 7.2 % | 0.88 |
+| **boosting** (gradient boosting, kept) | **1 389 €** | 7.0 % | 0.89 |
 | ridge (linear) | 1 496 € | 7.5 % | 0.86 |
 | random forest | 1 614 € | 8.3 % | 0.85 |
 | always the average price | 5 193 € | 30.8 % | 0.00 |
 
-The three real models are close: the choice of the algorithm matters less than the data.
+The boosting is told which columns are labels: brand, fuel and gearbox are categories, and the model (287 names, more
+than the 255 categories it accepts) is replaced by its mean price. Before, it read them as numbers in alphabetical order
+(Audi=1 < BMW=2...) and was wrong by 1 436 €.
 
-- **What matters most** (how much the error grows when a column is shuffled): power 2 095 €, year 1 568 €, model 1 000 €,
-  mileage 981 €, brand 860 €, fuel 425 €, gearbox 395 €, battery 120 € (low because only the electric cars have one;
-  with it, the error on the electric cars goes from 2 352 € to 2 201 €).
+- **What matters most** (how much the error grows when a column is shuffled): year 1 264 €, power 1 246 €, brand 1 157 €,
+  mileage 1 094 €, model 1 085 €, fuel 413 €, gearbox 370 €, battery 24 € (only the electric cars have one; on them, it
+  lowers the error from 1 799 € to 1 720 € on average over 4 cuts of the data, but not on every cut).
 
 ## Where the model is wrong
 
@@ -66,10 +68,10 @@ negative means the model estimates too low. Groups of fewer than 5 cars are left
 
 | Model | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
-| rare model (under 5 cars) | 339 | 3 241 € | 14.7 % | -1 135 € |
-| common model (5+ cars) | 2 354 | 1 176 € | 6.1 % | -20 € |
+| rare model (under 5 cars) | 339 | 2 857 € | 12.8 % | -638 € |
+| common model (5+ cars) | 2 354 | 1 178 € | 6.2 % | -60 € |
 
-A model with fewer than 5 cars in the data is estimated with an error **2.8 times larger**, and too low by 1 135 €
+A model with fewer than 5 cars in the data is estimated with an error **2.4 times larger**, and too low by 638 €
 on average: the model has hardly seen it, so it can only lean on the brand, the year and the mileage. 339 cars of the
 data are in this case.
 
@@ -77,64 +79,64 @@ data are in this case.
 
 | Price | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
-| cheapest quarter | 674 | 942 € | 8.3 % | +438 € |
-| second quarter | 673 | 1 032 € | 6.2 % | +197 € |
-| third quarter | 673 | 1 250 € | 6.1 % | -20 € |
-| most expensive quarter | 673 | 2 521 € | 8.3 % | -1 256 € |
+| cheapest quarter | 674 | 913 € | 8.0 % | +375 € |
+| second quarter | 673 | 986 € | 5.9 % | +120 € |
+| third quarter | 673 | 1 273 € | 6.2 % | -41 € |
+| most expensive quarter | 673 | 2 386 € | 8.0 % | -983 € |
 
-The most expensive quarter is estimated too low by 1 256 € on average, the cheapest quarter too high. The worst single
-errors are premium cars (a Volvo EX90 at 69 999 € estimated near 34 500 €, a Mercedes Classe V at 40 999 € near 20 700 €)
-and a Citroën AMI at 7 999 € estimated near 27 700 €: a licence-free quadricycle of 8 hp, below the 30 hp the cleaning
+The most expensive quarter is estimated too low by 983 € on average, the cheapest quarter too high. The worst single
+errors are premium cars (a Volvo EX90 at 69 999 € estimated near 43 300 €, a Mercedes Classe V at 40 999 € near 21 800 €).
+A Citroën AMI at 7 999 € is estimated near 22 900 €: a licence-free quadricycle of 8 hp, below the 30 hp the cleaning
 accepts, so its power is unknown and the model treats it like an ordinary electric car.
 
 **By fuel**:
 
 | Fuel | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
-| Électrique | 271 | 2 201 € | 9.3 % | -303 € |
-| Diesel | 461 | 1 731 € | 8.9 % | -325 € |
-| Hybride rechargeable | 196 | 2 070 € | 7.5 % | -316 € |
-| Essence | 1 069 | 987 € | 6.5 % | -10 € |
-| GPL | 19 | 1 000 € | 6.4 % | -139 € |
-| Hybride | 675 | 1 467 € | 6.3 % | -182 € |
+| Diesel | 461 | 1 724 € | 9.0 % | -255 € |
+| Électrique | 271 | 1 873 € | 8.1 % | +22 € |
+| Hybride rechargeable | 196 | 1 874 € | 6.7 % | -469 € |
+| GPL | 19 | 1 018 € | 6.4 % | -275 € |
+| Essence | 1 069 | 980 € | 6.4 % | -60 € |
+| Hybride | 675 | 1 484 € | 6.3 % | -119 € |
 
 **By brand** (the 10 brands with the most cars, and the 5 worst):
 
 | Brand | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
-| Volvo | 23 | 5 964 € | 16.1 % | -3 344 € |
-| Mercedes | 38 | 4 077 € | 14.7 % | -1 718 € |
-| Aion | 6 | 4 642 € | 14.1 % | -2 012 € |
-| Honda | 6 | 2 559 € | 12.5 % | -1 776 € |
-| BMW | 50 | 3 271 € | 12.2 % | -932 € |
-| Toyota | 82 | 2 283 € | 10.1 % | -42 € |
-| Volkswagen | 170 | 1 871 € | 8.6 % | -190 € |
-| Audi | 91 | 2 338 € | 8.4 % | -889 € |
-| Fiat | 70 | 1 088 € | 8.0 % | +349 € |
-| Renault | 365 | 1 282 € | 7.2 % | -56 € |
-| DS | 65 | 1 461 € | 6.9 % | -332 € |
-| Dacia | 81 | 1 111 € | 6.7 % | -96 € |
-| Opel | 145 | 1 076 € | 6.7 % | +112 € |
-| Citroën | 324 | 966 € | 6.3 % | +134 € |
-| Peugeot | 660 | 905 € | 5.3 % | -26 € |
+| Volvo | 23 | 5 304 € | 15.7 % | -2 538 € |
+| Mercedes | 38 | 3 816 € | 13.5 % | -905 € |
+| BMW | 50 | 3 067 € | 11.4 % | -270 € |
+| Mazda | 9 | 1 748 € | 9.2 % | -172 € |
+| Honda | 6 | 1 858 € | 8.9 % | -1 215 € |
+| Toyota | 82 | 2 073 € | 8.9 % | -187 € |
+| Volkswagen | 170 | 1 890 € | 8.5 % | -205 € |
+| Audi | 91 | 2 097 € | 7.8 % | -275 € |
+| DS | 65 | 1 452 € | 7.5 % | +267 € |
+| Renault | 365 | 1 219 € | 6.9 % | -156 € |
+| Peugeot | 660 | 1 086 € | 6.4 % | -86 € |
+| Fiat | 70 | 891 € | 6.2 % | +89 € |
+| Dacia | 81 | 1 028 € | 6.2 % | -94 € |
+| Citroën | 324 | 921 € | 5.9 % | +47 € |
+| Opel | 145 | 893 € | 5.6 % | +93 € |
 
 **By age and by mileage** (no strong pattern, between 5 % and 10 %; the oldest cars and those with the most kilometres are
 the least well estimated):
 
 | Age | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
-| 2026 (newest) | 125 | 2 050 € | 7.0 % | -399 € |
-| 2025 | 525 | 1 350 € | 5.2 % | -276 € |
-| 2023 to 2024 | 833 | 1 512 € | 7.0 % | -135 € |
-| 2020 to 2022 | 775 | 1 373 € | 7.5 % | -137 € |
-| before 2020 | 435 | 1 330 € | 9.5 % | -40 € |
+| 2026 (newest) | 125 | 1 840 € | 6.3 % | -330 € |
+| 2025 | 525 | 1 329 € | 5.2 % | -224 € |
+| 2023 to 2024 | 833 | 1 430 € | 6.6 % | -117 € |
+| 2020 to 2022 | 775 | 1 391 € | 7.7 % | -73 € |
+| before 2020 | 435 | 1 253 € | 8.9 % | -100 € |
 
 | Mileage | Cars | Mean error | % of the price | Bias |
 |---|---:|---:|---:|---:|
-| under 5 000 km | 233 | 1 294 € | 5.2 % | -114 € |
-| 5 000 to 30 000 km | 876 | 1 414 € | 6.3 % | -206 € |
-| 30 000 to 80 000 km | 1 033 | 1 485 € | 7.5 % | -178 € |
-| 80 000 km or more | 551 | 1 439 € | 9.1 % | -72 € |
+| under 5 000 km | 233 | 1 315 € | 5.2 % | -199 € |
+| 5 000 to 30 000 km | 876 | 1 376 € | 6.2 % | -137 € |
+| 30 000 to 80 000 km | 1 033 | 1 428 € | 7.2 % | -117 € |
+| 80 000 km or more | 551 | 1 370 € | 8.7 % | -125 € |
 
 ## Limits and risks
 
@@ -146,7 +148,7 @@ the least well estimated):
 - **Rare models and premium cars** are the weak points (tables above). A tool that shows an estimate should also show how
   many similar cars the data holds (the web application does).
 - **Two wrong powers remain**: a BMW written `220 170 DKG7` is read as 220 hp instead of 170, and an Audi e-tron written
-  `55 quattro 408` as 55 hp instead of 408 (one car each; the e-tron, at 33 599 €, is estimated near 15 400 €). Audi and hybrid cars were
+  `55 quattro 408` as 55 hp instead of 408 (one car each; the e-tron, at 33 599 €, is estimated near 16 800 €). Audi and hybrid cars were
   wrong before the correction of the power parser (71 cars).
 - **Small groups are noisy**: a group of 20 cars (LPG, Alfa Romeo...) gives an error that moves a lot from one scraping to
   the next. Do not read more into them than they say.
