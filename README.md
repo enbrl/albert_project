@@ -54,7 +54,12 @@ Run the scripts from the root of the project.
 python -m scripts.main
 ```
 
-The script asks for a URL (press Enter to use the default one, `https://quotes.toscrape.com/`), scrapes every page and saves the result, sorted by author, in `data/quotes_script.csv`.
+The script scrapes every page of `https://quotes.toscrape.com/` and saves the result, sorted by author, in `data/quotes_script.csv`. It never asks a question, so it can be run in a script. The options are:
+
+```bash
+python -m scripts.main --url https://quotes.toscrape.com/page/5/ --output data/page5.csv
+python -m scripts.main --help
+```
 
 To explore the notebooks:
 
