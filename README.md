@@ -34,6 +34,7 @@ All the parts of the project work:
 │   ├── aramis_scraper.py # scraping of the used-car listings (aramisauto)
 │   ├── datacleaning.py   # data cleaning
 │   ├── models.py         # price model: comparison, training, evaluation, prediction
+│   ├── evaluate.py       # where the model is wrong: the error of each group of cars
 │   ├── analysis.py       # statistics, charts and HTML report
 │   ├── predict.py        # estimate the price of one car (command line)
 │   ├── estimator.py      # what the web application needs, without Streamlit
@@ -41,6 +42,7 @@ All the parts of the project work:
 │   ├── datasourcing.py   # scraping example (quotes) + saving to CSV
 │   └── main.py           # command line of the scraping example
 ├── tests/             # automatic tests (pytest); tests/live uses the real website
+├── docs/              # model-card.md: what the model is, how wrong it is, where, and its limits
 ├── .github/workflows/ # tests on every pull request (old and new versions), web application, weekly check of the website
 ├── .pre-commit-config.yaml, ruff.toml  # automatic checks and formatting of the code, cleaning of the notebooks
 ├── pytest.ini
@@ -92,6 +94,7 @@ python -m scripts.aramis_scraper --all --output data/cars_raw.csv        # scrap
 python -m scripts.datacleaning data/cars_raw.csv -o data/cars_clean.csv  # clean
 python -m scripts.analysis data/cars_clean.csv --output reports/         # charts and reports/report.html (open it in a browser)
 python -m scripts.models data/cars_clean.csv                             # compare the models, train and save the best one
+python -m scripts.evaluate data/cars_clean.csv                           # where the model is wrong: the error by fuel, price, brand...
 python -m scripts.predict --name "Peugeot 208" --fuel Essence --gearbox Manuelle --km 60000 --year 2019 --power 100
 ```
 
@@ -99,6 +102,7 @@ Useful options:
 - `aramis_scraper --pages 5` scrapes only the first 5 pages (24 cars per page). The CSV is saved after every page; if the scraping stops, the message gives the command to continue (`--start-page N --append`).
 - Several raw files can be given to `datacleaning` (for example the CSV files of the notebooks): they are merged and the duplicates are removed.
 - `models --compare` only shows the comparison of the models, `models --kind ridge` trains a chosen one.
+- `evaluate` cuts the cars in groups (fuel, age, price, mileage, brand, rare or common model) and gives the error of each, on cars the model has not seen; `--output reports/evaluation.json` saves it. The results of the whole listing, and the limits of the model, are in [`docs/model-card.md`](docs/model-card.md).
 - `datacleaning` prints how many rows it removed and why (no name or price, impossible values, same listing seen twice, identical rows).
 - `predict --power` is optional and used only if the model was trained with the power.
 - A saved model (`models/price_model.joblib`) can only be read with the version of scikit-learn that made it. The versions are saved next to it in `models/price_model.json`: `python -m scripts.models --info models/price_model.joblib` shows them, and `predict` warns if they changed. After an update, train the model again.
