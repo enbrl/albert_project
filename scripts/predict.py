@@ -14,11 +14,12 @@ and 'Peugeot 208' are the same car, and 'Auto.' means 'Automatique'.
 
 import argparse
 import datetime
+import sys
 
 from scripts.analysis import euros
 from scripts.cli import run
 from scripts.datacleaning import FIRST_YEAR, normalize_fuel, normalize_gearbox, normalize_name
-from scripts.models import DEFAULT_MODEL_PATH, load_model, predict_price
+from scripts.models import DEFAULT_MODEL_PATH, compatibility_problem, load_model, predict_price, read_metadata
 
 
 def main(argv=None):
@@ -48,8 +49,12 @@ def main(argv=None):
         parser.exit(1, f'No model in {args.model}. Train it first: python -m scripts.models data/cars_clean.csv\n')
     except Exception as error:  # whatever the reason, a file that cannot be read is reported the same way
         # A model file can only be read with the version of scikit-learn that made it (or the file is broken)
-        parser.exit(1, f'The model in {args.model} cannot be read ({type(error).__name__}). It was probably saved with '
-                       'another version of scikit-learn: train it again with python -m scripts.models data/cars_clean.csv\n')
+        reason = compatibility_problem(read_metadata(args.model)) or 'it was probably saved with another version of scikit-learn'
+        parser.exit(1, f'The model in {args.model} cannot be read ({type(error).__name__}): {reason}. '
+                       'Train it again with python -m scripts.models data/cars_clean.csv\n')
+    problem = compatibility_problem(read_metadata(args.model))
+    if problem:
+        print(f'Warning: {problem}', file=sys.stderr)  # the model could be read, but the result may differ
 
     price = predict_price(
         model,
