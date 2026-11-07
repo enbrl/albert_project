@@ -15,7 +15,7 @@ Not everything described above is finished yet:
 
 | Part | Where | Status |
 |------|-------|--------|
-| Scraping of car listings (aramisauto, autoscout24) | `notebooks/` | Prototype in notebooks |
+| Scraping of car listings (aramisauto) | `scripts/aramis_scraper.py` | Working (`python -m scripts.aramis_scraper --pages 5`, 5 s between requests as asked by robots.txt) |
 | Scraping example (quotes) | `scripts/datasourcing.py`, `scripts/main.py` | Working, used as a template |
 | Data cleaning | `scripts/datacleaning.py` | Empty, to do |
 | Price model | `scripts/models.py` | Empty, to do |

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<!-- Simplified copy of the structure of an aramisauto.com listing page (values are made up). -->
+<body>
+<main>
+  <article class="vehicle-card">
+    <a class="vehicle-card__body-link" href="/voitures/peugeot/208/like/rv1"></a>
+    <div class="ds-card vehicle-card__container">
+      <div class="vehicle-card__price-info">
+        <div class="vehicle-card__price-row">
+          <span class="ds-text vehicle-card__selling-price"><!--[-->6 999 €<!--]--></span>
+          <span class="ds-text vehicle-card__catalog-price"><!--[-->9 050 €<!--]--></span>
+        </div>
+        <div class="vehicle-card__financing-row">
+          <span class="ds-text vehicle-card__monthly-price"><!--[-->dès 153 €/mois<!--]--></span>
+        </div>
+      </div>
+      <div class="vehicle-card__properties">
+        <div class="vehicle-properties vehicle-properties--small">
+          <div class="vehicle-properties__maker-model-row">
+            <h3 class="ds-text vehicle-properties__maker-model"><!--[-->Peugeot 208<!--]--></h3>
+            <div class="vehicle-properties__mileage">
+              <span class="ds-text"><!--[--> • <!--]--></span>
+              <span class="ds-text"><!--[-->94&#8239;410 km<!--]--></span>
+            </div>
+          </div>
+          <div class="vehicle-properties__column">
+            <div class="vehicle-properties__row">
+              <span class="ds-text vehicle-properties__engine-trim"><!--[-->1.2 PureTech 68 BVM5 • Like<!--]--></span>
+            </div>
+            <div class="vehicle-properties__row">
+              <span class="ds-text vehicle-properties__specs"><!--[-->2017 • Essence • Manuelle<!--]--></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article class="vehicle-card">
+    <div class="ds-card vehicle-card__container">
+      <div class="vehicle-card__price-info">
+        <div class="vehicle-card__price-row">
+          <span class="ds-text vehicle-card__selling-price"><!--[-->16 999 €<!--]--></span>
+        </div>
+      </div>
+      <div class="vehicle-card__properties">
+        <div class="vehicle-properties">
+          <div class="vehicle-properties__maker-model-row">
+            <h3 class="ds-text vehicle-properties__maker-model"><!--[-->Peugeot 2008<!--]--></h3>
+            <div class="vehicle-properties__mileage">
+              <span class="ds-text"><!--[--> • <!--]--></span>
+              <span class="ds-text"><!--[-->86 318 km<!--]--></span>
+            </div>
+          </div>
+          <div class="vehicle-properties__column">
+            <div class="vehicle-properties__row">
+              <span class="ds-text vehicle-properties__specs"><!--[-->2020 • Électrique • Auto. • 200 km WLTP<!--]--></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- A card without price (e.g. vehicle being sold) and without specs -->
+  <article class="vehicle-card">
+    <div class="ds-card vehicle-card__container">
+      <div class="vehicle-card__properties">
+        <div class="vehicle-properties">
+          <div class="vehicle-properties__maker-model-row">
+            <h3 class="ds-text vehicle-properties__maker-model"><!--[-->MG ZS<!--]--></h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- A card without any name must be ignored -->
+  <article class="vehicle-card">
+    <div class="vehicle-card__price-info"><span class="vehicle-card__selling-price">1 000 €</span></div>
+  </article>
+</main>
+</body>
+</html>
