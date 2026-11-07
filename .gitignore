@@ -18,3 +18,4 @@ data/*
 
 # Trained models
 *.joblib
+reports/
