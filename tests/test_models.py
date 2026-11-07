@@ -16,6 +16,7 @@ from scripts.models import (
     predict_price,
     prepare_features,
     save_model,
+    target_encoder,
     train_and_evaluate,
     train_final_model,
 )
@@ -201,6 +202,48 @@ def test_best_kind_never_answers_average(comparison):
 def test_compare_models_needs_enough_cars():
     with pytest.raises(ValueError, match='At least'):
         compare_models(make_cars(10))
+
+
+# ---------------------------------------------------------------- the labels of the boosting
+
+
+def test_the_boosting_reads_brand_fuel_and_gearbox_as_categories(cars):
+    model = train_final_model(cars, kind='boosting')
+    boosting = model.named_steps['model'].regressor_
+    categories = list(boosting.feature_names_in_[boosting.is_categorical_])
+    assert categories == ['Marque', 'Carburant', 'Boite de vitesse']  # not the mileage, the year or the model
+
+
+def test_the_boosting_replaces_the_model_by_its_mean_price(cars):
+    model = train_final_model(cars, kind='boosting')
+    preprocessing = model.named_steps['preprocessing']
+    names = pd.DataFrame({'Nom': ['Peugeot 3008', 'Renault Clio']})
+    encoded = np.asarray(preprocessing.named_transformers_['names'].transform(names))[:, 0]
+    assert encoded[0] > encoded[1] * 1.5  # a 3008 (30 000 EUR new) is worth much more than a Clio (14 000 EUR)
+
+
+def test_the_boosting_gives_the_same_model_at_every_run(cars):
+    car = cars.head(5)
+    first = train_final_model(cars, kind='boosting').predict(prepare_features(car))
+    second = train_final_model(cars, kind='boosting').predict(prepare_features(car))
+    np.testing.assert_allclose(first, second)
+
+
+def test_the_boosting_works_without_any_label(cars):
+    model = build_model('boosting', 42, ['Km', 'année']).fit(cars[['Km', 'année']], cars['Prix'])
+    assert model.predict(cars[['Km', 'année']].head(1))[0] > 0
+
+
+@pytest.mark.parametrize('version', ['1.9.1', '1.10.0', '2.0.0'])
+def test_the_target_encoder_takes_its_seed_in_the_cross_validation_from_scikit_learn_1_9(version):
+    encoder = target_encoder(7, version)
+    assert encoder.cv.random_state == 7 and encoder.cv.shuffle
+
+
+@pytest.mark.parametrize('version', ['1.5.0', '1.8.2'])
+def test_the_target_encoder_takes_its_seed_directly_before_scikit_learn_1_9(version):
+    encoder = target_encoder(7, version)
+    assert encoder.random_state == 7 and encoder.shuffle and encoder.cv == 5
 
 
 # ---------------------------------------------------------------- power
