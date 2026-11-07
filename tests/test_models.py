@@ -4,6 +4,12 @@ import pandas as pd
 import pytest
 
 from scripts.models import (
+    MODEL_KINDS,
+    best_kind,
+    build_model,
+    compare_models,
+    feature_columns,
+    feature_importance,
     load_model,
     main,
     predict_price,
@@ -13,11 +19,16 @@ from scripts.models import (
     train_final_model,
 )
 
-NAMES = {'Peugeot 208': 9000, 'Renault Clio': 8500, 'Peugeot 3008': 18000, 'Opel Astra': 11000}
+# Value of each model when it is new
+NAMES = {'Peugeot 208': 16000, 'Renault Clio': 14000, 'Peugeot 3008': 30000, 'Opel Astra': 18000}
 
 
 def make_cars(n=400, seed=0):
-    """Price = base price of the model - 0.07 EUR per km - 700 EUR per year of age (+ diesel bonus + noise)."""
+    """
+    Price = value when new, losing 10 % per year of age and 25 % per 100 000 km (+ 3 % for diesel, + noise).
+
+    It is the kind of rule a real market follows (a price is never negative).
+    """
     rng = np.random.default_rng(seed)
     rows = []
     for _ in range(n):
@@ -26,10 +37,19 @@ def make_cars(n=400, seed=0):
         km = int(rng.integers(5_000, 200_000))
         fuel = str(rng.choice(['Essence', 'Diesel']))
         gearbox = str(rng.choice(['Manuelle', 'Automatique']))
-        price = NAMES[name] + 9000 - 0.07 * km - 700 * (2026 - year) + (500 if fuel == 'Diesel' else 0)
-        price += rng.normal(0, 300)
+        price = NAMES[name] * 0.9 ** (2026 - year) * (1 - 0.25 * km / 100_000) * (1.03 if fuel == 'Diesel' else 1)
+        price *= rng.normal(1, 0.03)
         rows.append({'Nom': name, 'Carburant': fuel, 'Boite de vitesse': gearbox, 'Km': km, 'année': year, 'Prix': int(price)})
     return pd.DataFrame(rows)
+
+
+def make_cars_with_power(n=400, seed=0):
+    """The same cars, with a power (in horsepower) that changes the price by 0.5 % per horsepower around 100."""
+    cars = make_cars(n, seed)
+    power = np.random.default_rng(seed + 1).integers(60, 200, size=len(cars))
+    cars['Puissance'] = power
+    cars['Prix'] = (cars['Prix'] * (1 + 0.005 * (power - 100))).astype(int)
+    return cars
 
 
 @pytest.fixture(scope='module')
@@ -40,6 +60,17 @@ def cars():
 @pytest.fixture(scope='module')
 def trained(cars):
     return train_and_evaluate(cars)
+
+
+@pytest.fixture(scope='module')
+def cars_200():
+    return make_cars(200, seed=3)
+
+
+@pytest.fixture(scope='module')
+def comparison(cars_200):
+    """The comparison of all the models takes a few seconds: it is made once for all the tests."""
+    return compare_models(cars_200)
 
 
 def test_prepare_features_adds_the_brand():
@@ -106,8 +137,142 @@ def test_main_trains_and_saves(cars, tmp_path, capsys):
     cars.to_csv(csv, index=False)
     destination = tmp_path / 'out' / 'model.joblib'
 
-    metrics = main([str(csv), '--model', str(destination)])
+    metrics = main([str(csv), '--kind', 'forest', '--model', str(destination)])
 
     assert destination.exists()
     assert metrics['r2'] > 0.9
     assert 'Mean error' in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------- kinds of models, comparison
+
+@pytest.mark.parametrize('kind', MODEL_KINDS)
+def test_every_kind_of_model_learns_the_price_rule(cars, kind):
+    model, metrics = train_and_evaluate(cars, kind=kind)
+    assert metrics['r2'] > 0.8, kind
+    assert metrics['mae'] < metrics['baseline_mae'] / 2
+    assert 0 < metrics['mape'] < 20
+    price = predict_price(model, 'Peugeot 208', 'Essence', 'Manuelle', km=60_000, year=2019)
+    assert 3_000 < price < 20_000
+
+
+def test_unknown_kind_is_refused():
+    with pytest.raises(ValueError, match='Unknown kind'):
+        build_model('magic')
+
+
+def test_compare_models_gives_a_sorted_table_with_the_average_last(comparison):
+    table = comparison
+    assert set(table['model']) == {'average', *MODEL_KINDS}
+    assert list(table['mae']) == sorted(table['mae'])
+    assert table.iloc[-1]['model'] == 'average'  # always answering the mean price is the worst
+    assert set(table.columns) == {'model', 'mae', 'mae_std', 'rmse', 'r2', 'mape'}
+    assert table[table['model'] != 'average']['r2'].min() > 0.8
+    assert table[table['model'] == 'average'].iloc[0]['r2'] == pytest.approx(0, abs=0.05)
+
+
+def test_compare_models_is_reproducible(cars_200):
+    pd.testing.assert_frame_equal(compare_models(cars_200, kinds=('ridge',)), compare_models(cars_200, kinds=('ridge',)))
+
+
+def test_best_kind_never_answers_average(comparison):
+    table = comparison
+    assert best_kind(table) in MODEL_KINDS
+    assert best_kind(table) == table[table['model'] != 'average'].iloc[0]['model']
+
+
+def test_compare_models_needs_enough_cars():
+    with pytest.raises(ValueError, match='At least'):
+        compare_models(make_cars(10))
+
+
+# ---------------------------------------------------------------- power
+
+def test_power_is_used_when_the_data_has_it():
+    cars = make_cars_with_power()
+    assert feature_columns(cars)[-1] == 'Puissance'
+    assert feature_columns(make_cars(5)) == ['Marque', 'Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année']
+    assert 'Marque' in prepare_features(cars).columns and 'Puissance' in prepare_features(cars).columns
+
+
+def test_power_is_ignored_when_most_values_are_missing():
+    cars = make_cars_with_power(100)
+    cars.loc[cars.index[:70], 'Puissance'] = np.nan  # 70 % missing
+    assert 'Puissance' not in feature_columns(cars)
+
+
+@pytest.mark.parametrize('kind', MODEL_KINDS)
+def test_a_more_powerful_car_is_more_expensive(kind):
+    model = train_final_model(make_cars_with_power(), kind=kind)
+    args = ('Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)
+    weak = predict_price(model, *args, power=65)
+    strong = predict_price(model, *args, power=190)
+    assert strong > weak + 1500
+
+
+def test_the_power_given_to_a_model_trained_without_it_is_ignored(cars):
+    model = train_final_model(cars)
+    args = ('Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)
+    assert predict_price(model, *args, power=150) == pytest.approx(predict_price(model, *args))
+
+
+def test_unknown_power_is_replaced_by_the_median():
+    cars = make_cars_with_power()
+    cars.loc[cars.index[::5], 'Puissance'] = np.nan  # 20 % missing: still used
+    model, metrics = train_and_evaluate(cars)
+    assert metrics['r2'] > 0.85
+    price = predict_price(model, 'Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)  # no power given
+    assert 3_000 < price < 25_000
+
+
+# ---------------------------------------------------------------- importance
+
+def test_feature_importance_finds_what_matters():
+    table = feature_importance(make_cars_with_power(), n_repeats=3)
+    assert list(table.columns) == ['column', 'importance', 'std']
+    assert list(table['importance']) == sorted(table['importance'], reverse=True)
+    assert set(table['column']) == {'Marque', 'Nom', 'Carburant', 'Boite de vitesse', 'Km', 'année', 'Puissance'}
+    importance = table.set_index('column')['importance']
+    assert importance['Puissance'] > 300  # the price depends on the power...
+    assert importance['année'] > importance['Boite de vitesse']  # ...and on the age, not on the gearbox
+    assert abs(importance['Boite de vitesse']) < 100
+
+
+# ---------------------------------------------------------------- command line
+
+def test_main_compares_then_saves_the_best_by_default(cars_200, tmp_path, capsys):
+    csv = tmp_path / 'cars_clean.csv'
+    cars_200.to_csv(csv, index=False)
+    destination = tmp_path / 'out' / 'best.joblib'
+    main([str(csv), '--model', str(destination)])
+    output = capsys.readouterr().out
+    assert 'Comparison' in output and 'average' in output and 'Model: ' in output
+    assert load_model(str(destination)) is not None
+
+
+def test_main_compare_only_does_not_save(cars_200, tmp_path, capsys):
+    csv = tmp_path / 'cars_clean.csv'
+    cars_200.to_csv(csv, index=False)
+    destination = tmp_path / 'never.joblib'
+    table = main([str(csv), '--compare', '--model', str(destination)])
+    assert not destination.exists()
+    assert 'Comparison' in capsys.readouterr().out
+    assert 'model' in table.columns
+
+
+def test_main_with_a_chosen_kind_does_not_compare(cars_200, tmp_path, capsys):
+    csv = tmp_path / 'cars_clean.csv'
+    cars_200.to_csv(csv, index=False)
+    destination = tmp_path / 'ridge.joblib'
+    main([str(csv), '--kind', 'ridge', '--model', str(destination)])
+    output = capsys.readouterr().out
+    assert 'Comparison' not in output and 'Model: ridge' in output
+    assert destination.exists()
+
+
+def test_main_unknown_kind_is_refused(cars_200, tmp_path):
+    csv = tmp_path / 'cars_clean.csv'
+    cars_200.to_csv(csv, index=False)
+    with pytest.raises(SystemExit) as stop:
+        main([str(csv), '--kind', 'magic'])
+    assert stop.value.code == 2
