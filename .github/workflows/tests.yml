@@ -30,8 +30,8 @@ jobs:
       - name: Install the packages
         run: pip install -r requirements.txt
 
-      - name: Run the tests
-        run: python -m pytest
+      - name: Run the tests (and check how much of the code they run)
+        run: python -m pytest --cov
 
   # The oldest packages that requirements.txt allows (constraints-min.txt), with Python 3.9
   oldest:
