@@ -1,0 +1,23 @@
+# Checks run automatically before each commit (https://pre-commit.com).
+# Install once:  pip install pre-commit && pre-commit install
+# Run on all the files:  pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4
+    hooks:
+      - id: ruff-check
+
+  # Removes the results saved in the notebooks (they make the files huge and the diffs unreadable)
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout
+        args: ['--keep-id']  # keep the identifier of the cells: no noise in the diffs
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
