@@ -58,7 +58,7 @@ def test_unreadable_model_gives_a_clear_message(tmp_path, capsys):
                       '--gearbox', 'Manuelle', '--km', '1000', '--year', '2020'])
     assert stop.value.code == 1
     error = capsys.readouterr().err
-    assert 'cannot be read' in error and 'train it again' in error
+    assert 'cannot be read' in error and 'train it again' in error.lower()
 
 
 def test_negative_mileage_is_refused(model_file, capsys):

@@ -10,6 +10,7 @@ Usage (from the root of the project):
     python -m scripts.models data/cars_clean.csv                  # the best model is chosen and saved
     python -m scripts.models data/cars_clean.csv --kind forest    # or boosting, ridge
     python -m scripts.models data/cars_clean.csv --compare        # only show the comparison
+    python -m scripts.models --info models/price_model.joblib     # what a saved model is
 
 How the models are compared: the cars are cut in 5 parts; each model learns on 4 parts and is
 tested on the 5th, 5 times, so every car is used for the test once. The table gives the average
@@ -26,11 +27,15 @@ The labels (fuel, gearbox...) must be the ones of the cleaned file.
 """
 
 import argparse
+import datetime
+import json
 import os
+import sys
 
 import joblib
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.compose import ColumnTransformer, TransformedTargetRegressor
 from sklearn.dummy import DummyRegressor
 from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
@@ -247,12 +252,101 @@ def feature_importance(df, kind=DEFAULT_KIND, test_size=0.2, n_repeats=10, rando
     return table.sort_values('importance', ascending=False).reset_index(drop=True)
 
 
-def save_model(model, filename=DEFAULT_MODEL_PATH):
-    """Save the model in a file (the folder is created if needed)."""
+def metadata_path(filename):
+    """Where the information about a model is saved: next to the model, with .json (models/price.joblib -> models/price.json)."""
+    return os.path.splitext(filename)[0] + '.json'
+
+
+def library_versions():
+    """The versions of what is needed to read a saved model again."""
+    return {
+        'python': '.'.join(str(part) for part in sys.version_info[:3]),
+        'scikit-learn': sklearn.__version__,
+        'pandas': pd.__version__,
+        'numpy': np.__version__,
+        'joblib': joblib.__version__,
+    }
+
+
+def make_metadata(df, kind, metrics, columns):
+    """
+    The information that tells what a saved model is.
+
+    Parameters:
+    - df: the cars the model was trained on
+    - kind: the kind of model ('boosting'...)
+    - metrics: the dictionary of errors given by train_and_evaluate (measured on cars the model had not seen)
+    - columns: the columns the model uses
+    """
+    return {
+        'created': datetime.date.today().isoformat(),
+        'kind': kind,
+        'cars': int(len(df)),
+        'columns': list(columns),
+        'metrics': {key: (round(value, 3) if isinstance(value, float) else value) for key, value in metrics.items()},
+    }
+
+
+def save_model(model, filename=DEFAULT_MODEL_PATH, metadata=None):
+    """
+    Save the model in a file (the folder is created if needed), and the information about it next to it.
+
+    The information (see make_metadata) is saved with the versions of scikit-learn, pandas...
+    in a .json file: a model can only be read with the version of scikit-learn that made it.
+    """
     folder = os.path.dirname(filename)
     if folder:
         os.makedirs(folder, exist_ok=True)
     joblib.dump(model, filename)
+    information = {**(metadata or {}), 'versions': library_versions()}
+    with open(metadata_path(filename), 'w', encoding='utf-8') as file:
+        json.dump(information, file, indent=2, ensure_ascii=False)
+        file.write('\n')
+
+
+def read_metadata(filename=DEFAULT_MODEL_PATH):
+    """The information saved with a model, or None if there is none (or it cannot be read)."""
+    try:
+        with open(metadata_path(filename), encoding='utf-8') as file:
+            information = json.load(file)
+    except (OSError, ValueError):
+        return None
+    return information if isinstance(information, dict) else None
+
+
+def _minor(version):
+    """'1.6.1' -> '1.6' (the first two numbers)."""
+    return '.'.join(str(version).split('.')[:2])
+
+
+def compatibility_problem(metadata):
+    """
+    A sentence if the model was saved with another version of scikit-learn than the installed one, else None.
+
+    Only the first two numbers count: 1.6.1 and 1.6.2 are the same.
+    """
+    saved = ((metadata or {}).get('versions') or {}).get('scikit-learn')
+    if saved and _minor(saved) != _minor(sklearn.__version__):
+        return (f'this model was saved with scikit-learn {saved}, but scikit-learn {sklearn.__version__} is installed: '
+                'train it again if the results look wrong')
+    return None
+
+
+def describe_model(metadata):
+    """The lines that tell what a saved model is, from its information."""
+    metrics = metadata.get('metrics') or {}
+    lines = [
+        f"Model: {metadata.get('kind', '?')}, trained on {metadata.get('cars', '?')} cars on {metadata.get('created', '?')}",
+        f"Columns: {', '.join(metadata.get('columns') or [])}",
+    ]
+    if 'mae' in metrics:
+        lines.append(f"Mean error on cars it had not seen: {metrics['mae']:.0f} EUR ({metrics.get('mape', 0):.1f} % of the price)")
+    versions = metadata.get('versions') or {}
+    lines.append('Saved with: ' + ', '.join(f'{name} {version}' for name, version in versions.items()))
+    problem = compatibility_problem(metadata)
+    if problem:
+        lines.append(f'Warning: {problem}')
+    return lines
 
 
 def load_model(filename=DEFAULT_MODEL_PATH):
@@ -286,12 +380,22 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Compare, train and save the used-car price model')
-    parser.add_argument('data', help='cleaned CSV file (made by scripts/datacleaning.py)')
+    parser.add_argument('data', nargs='?', help='cleaned CSV file (made by scripts/datacleaning.py)')
     parser.add_argument('--model', default=DEFAULT_MODEL_PATH, help=f'file where the model is saved (default: {DEFAULT_MODEL_PATH})')
     parser.add_argument('--kind', default='best', choices=('best', *MODEL_KINDS),
                         help="model to train (default: 'best', the one with the lowest error in the comparison)")
     parser.add_argument('--compare', action='store_true', help='only show the comparison of the models, do not save anything')
+    parser.add_argument('--info', metavar='MODEL', help='show what a saved model is (date, cars, error, versions) and stop')
     args = parser.parse_args(argv)
+
+    if args.info:
+        metadata = read_metadata(args.info)
+        if metadata is None:
+            raise UserError(f'No information about the model {args.info} (looked in {metadata_path(args.info)})')
+        print('\n'.join(describe_model(metadata)))
+        return metadata
+    if not args.data:
+        parser.error('the data file is required (or use --info MODEL)')
 
     df = pd.read_csv(args.data)
     columns = feature_columns(df)
@@ -313,7 +417,7 @@ def main(argv=None):
     print(f"RMSE: {metrics['rmse']:.0f} EUR, R2: {metrics['r2']:.2f}")
 
     model = train_final_model(df, kind=kind)  # the saved model learns from all the cars
-    save_model(model, args.model)
+    save_model(model, args.model, make_metadata(df, kind, metrics, columns))
     print(f'Model saved in {args.model}')
     return metrics
 
