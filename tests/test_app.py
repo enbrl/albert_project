@@ -13,7 +13,7 @@ pytest.importorskip('streamlit', reason='Streamlit is not installed (pip install
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 from scripts.models import save_model, train_final_model  # noqa: E402
-from tests.test_models import make_cars, make_cars_with_power  # noqa: E402
+from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power  # noqa: E402
 
 APP = str(Path(__file__).resolve().parent.parent / 'app.py')
 
@@ -28,6 +28,9 @@ def files(tmp_path_factory):
     power_cars = make_cars_with_power(300, seed=4)
     power_cars.to_csv(folder / 'power_cars.csv', index=False)
     save_model(train_final_model(power_cars, kind='ridge'), str(folder / 'power.joblib'))
+    battery_cars = make_cars_with_battery(450, seed=4)
+    battery_cars.to_csv(folder / 'battery_cars.csv', index=False)
+    save_model(train_final_model(battery_cars, kind='ridge'), str(folder / 'battery.joblib'))
     return folder
 
 
@@ -122,6 +125,18 @@ def test_the_power_changes_the_estimate_when_the_model_knows_it(files):
         return int(app.metric[0].value.replace(' €', '').replace(' ', '').replace(' ', ''))
 
     assert price(190) > price(65) + 1000
+
+
+def test_the_battery_changes_the_estimate_of_an_electric_car_when_the_model_knows_it(files):
+    def price(battery):
+        app = start(files / 'battery.joblib', files / 'battery_cars.csv')
+        app.selectbox[0].set_value('Opel Astra')
+        app.selectbox[1].set_value('Électrique')
+        app.number_input[3].set_value(battery)
+        app.button[0].click().run()
+        return int(app.metric[0].value.replace(' €', '').replace(' ', '').replace(' ', ''))
+
+    assert price(100) > price(40) + 1000
 
 
 # ---------------------------------------------------------------- the two languages

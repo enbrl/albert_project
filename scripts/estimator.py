@@ -94,11 +94,11 @@ def typical_error(model_path):
     return float(error) if isinstance(error, (int, float)) else None
 
 
-def estimate(model, name, fuel, gearbox, km, year, power=None):
+def estimate(model, name, fuel, gearbox, km, year, power=None, battery=None):
     """
     The price (in euros) that the model estimates. The labels are cleaned like in the data ('Auto.' = Automatique).
 
-    A power of 0 or None means unknown.
+    A power or a battery of 0 or None means unknown.
     """
     return predict_price(
         model,
@@ -108,4 +108,5 @@ def estimate(model, name, fuel, gearbox, km, year, power=None):
         km,
         year,
         power=power or None,
+        battery=battery or None,
     )

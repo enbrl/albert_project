@@ -3,7 +3,8 @@
 
 The input is the cleaned file made by scripts/datacleaning.py, with the columns
 Nom, Carburant, Boite de vitesse, Km, année, Prix (and optionally Marque and
-Puissance, the power in horsepower: it is used when the file has it).
+Puissance, the power in horsepower, and Batterie, the capacity in kWh of the electric cars: they are used when
+the file has them).
 
 Usage (from the root of the project):
 
@@ -51,7 +52,7 @@ from scripts.cli import UserError, run
 
 CATEGORICAL_FEATURES = ['Marque', 'Nom', 'Carburant', 'Boite de vitesse']
 NUMERIC_FEATURES = ['Km', 'année']
-OPTIONAL_NUMERIC_FEATURES = ['Puissance']  # used only when the data has it (and enough of it)
+OPTIONAL_NUMERIC_FEATURES = ['Puissance', 'Batterie']  # used only when the data has it (and enough of it)
 FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 TARGET = 'Prix'
 
@@ -67,16 +68,25 @@ MIN_ROWS = 20
 
 # A column such as Puissance is used only if at least this share of the cars have it
 MIN_SHARE_FILLED = 0.5
+# Batterie (kWh) only exists for electric cars: it is used if at least this share of the electric cars have it,
+# and there are at least MIN_ELECTRIC_CARS of them (below, there is nothing to learn from)
+ELECTRIC = 'Électrique'
+MIN_ELECTRIC_CARS = 10
+
+
+def is_usable(df, column):
+    """Does the data have enough of this optional column to learn from it?"""
+    if column not in df.columns:
+        return False
+    if column == 'Batterie':  # a petrol car has no battery capacity: look at the electric cars only
+        battery = df.loc[df['Carburant'] == ELECTRIC, column] if 'Carburant' in df.columns else df[column].iloc[:0]
+        return len(battery) >= MIN_ELECTRIC_CARS and battery.notna().mean() >= MIN_SHARE_FILLED
+    return df[column].notna().mean() >= MIN_SHARE_FILLED
 
 
 def feature_columns(df):
     """The columns used by the model for this data: the usual ones, plus the optional ones the data has."""
-    optional = [
-        column
-        for column in OPTIONAL_NUMERIC_FEATURES
-        if column in df.columns and df[column].notna().mean() >= MIN_SHARE_FILLED
-    ]
-    return FEATURES + optional
+    return FEATURES + [column for column in OPTIONAL_NUMERIC_FEATURES if is_usable(df, column)]
 
 
 def prepare_features(df, columns=None):
@@ -377,7 +387,7 @@ def load_model(filename=DEFAULT_MODEL_PATH):
     return joblib.load(filename)
 
 
-def predict_price(model, name, fuel, gearbox, km, year, power=None):
+def predict_price(model, name, fuel, gearbox, km, year, power=None, battery=None):
     """
     Estimate the price (in euros) of one used car.
 
@@ -388,6 +398,7 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None):
     - km: mileage
     - year: year of the first registration
     - power: power in horsepower; used only if the model was trained with the power (otherwise ignored)
+    - battery: capacity of the battery in kWh (electric cars); used only if the model was trained with it
     """
     car = pd.DataFrame(
         [
@@ -398,6 +409,7 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None):
                 'Km': km,
                 'année': year,
                 'Puissance': np.nan if power is None else power,
+                'Batterie': np.nan if battery is None else battery,
             }
         ]
     )

@@ -18,6 +18,7 @@ from scripts.aramis_scraper import (
     make_session,
     parse_listing_page,
     parse_number,
+    parse_battery,
     parse_power,
     save_listings,
     scrape_listings,
@@ -431,3 +432,21 @@ def test_main_without_append_replaces_the_file(fake_site, no_wait, tmp_path):
     main(['--pages', '2', '--output', destination])
     df = main(['--pages', '1', '--output', destination])
     assert len(df) == 3
+
+
+@pytest.mark.parametrize(
+    'engine, expected',
+    [
+        ('50 kWh - 136', 50.0),
+        ('82kWh - 498', 82.0),
+        ('80,5 Kwh - 204', 80.5),
+        ('77.4 KWH AWD', 77.4),
+        ('1.2 PureTech 68 BVM5', None),
+        ('2008 Hybrid 145 ch e-DCS6', None),
+        ('', None),
+        (None, None),
+        (float('nan'), None),
+    ],
+)
+def test_parse_battery(engine, expected):
+    assert parse_battery(engine) == expected

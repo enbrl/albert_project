@@ -105,7 +105,7 @@ Useful options:
 - `models --compare` only shows the comparison of the models, `models --kind ridge` trains a chosen one.
 - `evaluate` cuts the cars in groups (fuel, age, price, mileage, brand, rare or common model) and gives the error of each, on cars the model has not seen; `--output reports/evaluation.json` saves it. The results of the whole listing, and the limits of the model, are in [`docs/model-card.md`](docs/model-card.md).
 - `datacleaning` prints how many rows it removed and why (no name or price, impossible values, same listing seen twice, identical rows).
-- `predict --power` is optional and used only if the model was trained with the power.
+- `predict --power` and `--battery` (kWh, electric cars) are optional and used only if the model was trained with them.
 - A saved model (`models/price_model.joblib`) can only be read with the version of scikit-learn that made it. The versions are saved next to it in `models/price_model.json`: `python -m scripts.models --info models/price_model.joblib` shows them, and `predict` warns if they changed. After an update, train the model again.
 - A wrong input gives one line `Error: ...` and the exit code 1 (for example a file that does not exist), not a page of technical error.
 

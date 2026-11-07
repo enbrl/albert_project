@@ -55,6 +55,17 @@ def make_cars_with_power(n=400, seed=0):
     return cars
 
 
+def make_cars_with_battery(n=400, seed=0):
+    """Every third car is electric, with a battery of 40 to 100 kWh that changes its price by 1 % per kWh around 60."""
+    cars = make_cars_with_power(n, seed)
+    battery = np.random.default_rng(seed + 2).integers(40, 101, size=len(cars)).astype(float)
+    electric = np.arange(len(cars)) % 3 == 0
+    cars['Carburant'] = np.where(electric, 'Électrique', cars['Carburant'])
+    cars['Batterie'] = np.where(electric, battery, np.nan)
+    cars['Prix'] = np.where(electric, cars['Prix'] * (1 + 0.01 * (battery - 60)), cars['Prix']).astype(int)
+    return cars
+
+
 @pytest.fixture(scope='module')
 def cars():
     return make_cars()
@@ -230,6 +241,66 @@ def test_unknown_power_is_replaced_by_the_median():
     assert metrics['r2'] > 0.85
     price = predict_price(model, 'Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)  # no power given
     assert 3_000 < price < 25_000
+
+
+# ---------------------------------------------------------------- battery
+
+
+def test_battery_is_used_when_the_electric_cars_have_it():
+    cars = make_cars_with_battery()
+    assert feature_columns(cars)[-2:] == ['Puissance', 'Batterie']
+    assert 'Batterie' in prepare_features(cars).columns
+
+
+def test_battery_is_judged_on_the_electric_cars_not_on_all_the_cars():
+    cars = make_cars_with_battery()
+    assert cars['Batterie'].notna().mean() < 0.5  # two thirds of the cars have no battery, and that is normal
+    assert 'Batterie' in feature_columns(cars)
+
+
+def test_battery_is_ignored_when_most_electric_cars_have_no_value():
+    cars = make_cars_with_battery()
+    electric = cars.index[cars['Carburant'] == 'Électrique']
+    cars.loc[electric[: int(len(electric) * 0.7)], 'Batterie'] = np.nan
+    assert 'Batterie' not in feature_columns(cars)
+
+
+def test_battery_is_ignored_when_there_are_too_few_electric_cars():
+    cars = make_cars_with_battery()
+    electric = cars.index[cars['Carburant'] == 'Électrique']
+    cars.loc[electric[5:], 'Carburant'] = 'Essence'  # 5 electric cars left
+    assert 'Batterie' not in feature_columns(cars)
+
+
+def test_battery_is_ignored_when_the_data_has_no_fuel_column():
+    cars = make_cars_with_battery().drop(columns=['Carburant'])
+    assert 'Batterie' not in feature_columns(cars)
+
+
+# The forest shares its trees between many columns, so with 600 cars it takes less from the battery (+555 EUR for
+# +60 kWh, against +4 500 EUR for the boosting and +7 300 EUR for the linear model): it only has to go the right way
+MINIMUM_RISE = {'forest': 200, 'boosting': 1500, 'ridge': 1500}
+
+
+@pytest.mark.parametrize('kind', MODEL_KINDS)
+def test_an_electric_car_with_a_bigger_battery_is_more_expensive(kind):
+    model = train_final_model(make_cars_with_battery(600), kind=kind)
+    args = ('Opel Astra', 'Électrique', 'Automatique', 40_000, 2022)
+    small = predict_price(model, *args, battery=40)
+    large = predict_price(model, *args, battery=100)
+    assert large > small + MINIMUM_RISE[kind]
+
+
+def test_the_battery_given_to_a_model_trained_without_it_is_ignored(cars):
+    model = train_final_model(cars)
+    args = ('Opel Astra', 'Électrique', 'Automatique', 60_000, 2019)
+    assert predict_price(model, *args, battery=80) == pytest.approx(predict_price(model, *args))
+
+
+def test_an_unknown_battery_still_gives_a_price():
+    model = train_final_model(make_cars_with_battery(), kind='boosting')
+    price = predict_price(model, 'Opel Astra', 'Électrique', 'Automatique', 40_000, 2022)
+    assert 3_000 < price < 40_000
 
 
 # ---------------------------------------------------------------- importance

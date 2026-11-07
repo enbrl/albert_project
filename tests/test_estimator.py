@@ -17,7 +17,7 @@ from scripts.estimator import (
     typical_error,
 )
 from scripts.models import save_model, train_final_model
-from tests.test_models import make_cars, make_cars_with_power
+from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power
 
 
 @pytest.fixture(scope='module')
@@ -158,3 +158,10 @@ def test_typical_error_of_unusable_information(tmp_path, content):
 
 def test_typical_error_without_file(tmp_path):
     assert typical_error(str(tmp_path / 'nothing.joblib')) is None
+
+
+def test_estimate_uses_the_battery_when_the_model_knows_it():
+    model = train_final_model(make_cars_with_battery(450, seed=4), kind='ridge')
+    arguments = ('Opel Astra', 'Électrique', 'Automatique', 40_000, 2022)
+    assert estimate(model, *arguments, battery=100) > estimate(model, *arguments, battery=40) + 1000
+    assert estimate(model, *arguments, battery=0) == pytest.approx(estimate(model, *arguments))  # 0 means unknown
