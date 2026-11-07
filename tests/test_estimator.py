@@ -17,7 +17,7 @@ from scripts.estimator import (
     typical_error,
 )
 from scripts.models import save_model, train_final_model
-from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power
+from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power, make_cars_with_trim
 
 
 @pytest.fixture(scope='module')
@@ -165,3 +165,11 @@ def test_estimate_uses_the_battery_when_the_model_knows_it():
     arguments = ('Opel Astra', 'Électrique', 'Automatique', 40_000, 2022)
     assert estimate(model, *arguments, battery=100) > estimate(model, *arguments, battery=40) + 1000
     assert estimate(model, *arguments, battery=0) == pytest.approx(estimate(model, *arguments))  # 0 means unknown
+
+
+def test_estimate_uses_the_trim_when_the_model_knows_it():
+    model = train_final_model(make_cars_with_trim(450, seed=4), kind='ridge')
+    arguments = ('Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)
+    assert estimate(model, *arguments, trim=' GT Line ') > estimate(model, *arguments, trim='Active') * 1.1
+    for empty in ('', '   ', None):  # an empty trim means unknown
+        assert estimate(model, *arguments, trim=empty) == pytest.approx(estimate(model, *arguments))

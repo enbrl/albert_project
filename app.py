@@ -104,13 +104,14 @@ with st.form('car'):
     battery = st.number_input(
         t('battery'), min_value=0, max_value=300, value=0, step=5, help=t('battery_help'), key='battery'
     )
+    trim = st.text_input(t('trim'), '', help=t('trim_help'), key='trim')
     submitted = st.form_submit_button(t('submit'), type='primary')
 
 if submitted:
     if not name.strip():
         st.warning(t('empty_name'))
         st.stop()
-    price = estimate(model, name, fuel, gearbox, int(km), int(year), int(power), int(battery))
+    price = estimate(model, name, fuel, gearbox, int(km), int(year), int(power), int(battery), trim)
     st.metric(t('estimated_price'), euros(round(price, -2)))
     mean_error = typical_error(model_path)
     if mean_error:

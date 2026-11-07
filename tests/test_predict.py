@@ -6,7 +6,7 @@ import pytest
 
 from scripts import predict
 from scripts.models import save_model, train_final_model
-from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power
+from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power, make_cars_with_trim
 
 
 @pytest.fixture(scope='module')
@@ -257,3 +257,23 @@ def test_impossible_battery_is_refused(model_file, battery, capsys):
         run(model_file, *arguments)
     assert stop.value.code == 2
     assert '--battery must be positive' in capsys.readouterr().err
+
+
+def test_trim_makes_the_estimate_change(tmp_path):
+    path = str(tmp_path / 'price.joblib')
+    save_model(train_final_model(make_cars_with_trim(600)), path)
+    arguments = [
+        '--name',
+        'Opel Astra',
+        '--fuel',
+        'Essence',
+        '--gearbox',
+        'Manuelle',
+        '--km',
+        '60000',
+        '--year',
+        '2019',
+    ]
+    basic = run(path, *arguments, '--trim', 'Active')
+    sport = run(path, *arguments, '--trim', 'GT Line')
+    assert sport > basic * 1.1
