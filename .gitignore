@@ -15,3 +15,6 @@ venv/
 # keep the data/ folder in the repository, but nothing else inside it
 data/*
 !data/.gitkeep
+
+# Trained models
+*.joblib
