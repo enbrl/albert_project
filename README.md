@@ -38,6 +38,7 @@ All the parts of the project work:
 │   ├── analysis.py       # statistics, charts and HTML report
 │   ├── predict.py        # estimate the price of one car (command line)
 │   ├── estimator.py      # what the web application needs, without Streamlit
+│   ├── app_texts.py      # the texts of the web application, in English and in French
 │   ├── cli.py            # clear error messages shared by the command lines
 │   ├── datasourcing.py   # scraping example (quotes) + saving to CSV
 │   └── main.py           # command line of the scraping example
@@ -114,6 +115,8 @@ To estimate a price in a browser (after training the model):
 pip install -r requirements-app.txt
 streamlit run app.py
 ```
+
+The application is in English or in French: the choice is at the top of the sidebar (`Language / Langue`), and what you typed is kept when you switch. The texts are in `scripts/app_texts.py`.
 
 For a quick try on a small sample (about 20 seconds), open `notebooks/demo_pipeline.ipynb`.
 
