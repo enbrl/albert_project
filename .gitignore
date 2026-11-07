@@ -2,9 +2,16 @@
 .DS_Store
 .ipynb_checkpoints
 *.pyc
+__pycache__/
 
+# Virtual environments
+.venv/
+venv/
 
 # Data files
 *.csv
 *.sqlite
 *.zip
+# keep the data/ folder in the repository, but nothing else inside it
+data/*
+!data/.gitkeep
