@@ -1,0 +1,25 @@
+name: Check the website
+
+# Once a week (Monday, early morning UTC) and on demand (Actions tab > Run workflow):
+# 2 requests on aramisauto.com to check that the scraper still understands the pages.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install the packages
+        run: pip install requests beautifulsoup4 pandas pytest
+
+      - name: Check the real website
+        run: python -m pytest -m live
