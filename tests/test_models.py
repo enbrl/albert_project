@@ -6,6 +6,7 @@ import pytest
 
 from scripts.models import (
     MODEL_KINDS,
+    add_trim_family,
     best_kind,
     build_model,
     compare_models,
@@ -64,6 +65,19 @@ def make_cars_with_battery(n=400, seed=0):
     cars['Carburant'] = np.where(electric, 'Électrique', cars['Carburant'])
     cars['Batterie'] = np.where(electric, battery, np.nan)
     cars['Prix'] = np.where(electric, cars['Prix'] * (1 + 0.01 * (battery - 60)), cars['Prix']).astype(int)
+    return cars
+
+
+# The price of each family of trim, compared with the basic one
+TRIM_FAMILIES = {'Active': 0.9, 'Active Pack': 0.9, 'Allure': 1.0, 'Allure Pack': 1.0, 'GT': 1.2, 'GT Line': 1.2}
+
+
+def make_cars_with_trim(n=400, seed=0):
+    """The same cars with a trim: an 'Active' is 10 % cheaper than an 'Allure', a 'GT' 20 % more expensive."""
+    cars = make_cars_with_power(n, seed)
+    trims = np.random.default_rng(seed + 3).choice(list(TRIM_FAMILIES), size=len(cars))
+    cars['Finition'] = trims
+    cars['Prix'] = (cars['Prix'] * np.array([TRIM_FAMILIES[trim] for trim in trims])).astype(int)
     return cars
 
 
@@ -344,6 +358,75 @@ def test_an_unknown_battery_still_gives_a_price():
     model = train_final_model(make_cars_with_battery(), kind='boosting')
     price = predict_price(model, 'Opel Astra', 'Électrique', 'Automatique', 40_000, 2022)
     assert 3_000 < price < 40_000
+
+
+# ---------------------------------------------------------------- trim
+
+
+def test_the_family_of_a_trim_is_its_first_word_in_small_letters():
+    cars = pd.DataFrame({'Finition': ['Allure Pack', 'GT Line', 'gt', '   ', '', None, np.nan]})
+    families = add_trim_family(cars)['Gamme']
+    assert families[:3].tolist() == ['allure', 'gt', 'gt']
+    assert families[3:].isna().all()  # an empty trim is an unknown family
+
+
+def test_without_trim_the_cars_are_unchanged(cars):
+    assert add_trim_family(cars) is cars
+    assert 'Gamme' not in feature_columns(cars)
+
+
+def test_a_family_already_given_is_kept():
+    cars = pd.DataFrame({'Finition': ['Allure Pack'], 'Gamme': ['other']})
+    assert add_trim_family(cars)['Gamme'].tolist() == ['other']
+
+
+def test_the_family_is_used_when_most_cars_have_a_trim():
+    cars = make_cars_with_trim()
+    assert feature_columns(cars)[-1] == 'Gamme'
+    assert 'Gamme' in prepare_features(cars).columns
+    cars.loc[cars.index[: 70 * len(cars) // 100], 'Finition'] = None  # 70 % unknown
+    assert 'Gamme' not in feature_columns(cars)
+
+
+# The forest shares its trees between many columns and takes less from the trim (+5 % for +33 % with 600 cars)
+MINIMUM_TRIM_RISE = {'forest': 1.03, 'boosting': 1.1, 'ridge': 1.1}
+
+
+@pytest.mark.parametrize('kind', MODEL_KINDS)
+def test_a_better_equipped_car_is_more_expensive(kind):
+    model = train_final_model(make_cars_with_trim(600), kind=kind)
+    args = ('Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)
+    basic = predict_price(model, *args, trim='Active')
+    sport = predict_price(model, *args, trim='GT Line')
+    assert sport > basic * MINIMUM_TRIM_RISE[kind]
+    # only the first word counts, whatever the case
+    assert predict_price(model, *args, trim='gt pack') == pytest.approx(sport)
+
+
+def test_an_unknown_or_missing_trim_still_gives_a_price():
+    model = train_final_model(make_cars_with_trim(), kind='boosting')
+    args = ('Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)
+    assert 3_000 < predict_price(model, *args, trim='Never Seen') < 40_000
+    assert 3_000 < predict_price(model, *args) < 40_000  # no trim at all: it must not crash
+
+
+@pytest.mark.parametrize('kind', MODEL_KINDS)
+def test_every_model_trained_with_the_trim_works_without_it(kind):
+    model = train_final_model(make_cars_with_trim(), kind=kind)
+    assert predict_price(model, 'Opel Astra', 'Essence', 'Manuelle', 60_000, 2019, trim=None) > 0
+
+
+def test_the_trim_given_to_a_model_trained_without_it_is_ignored(cars):
+    model = train_final_model(cars)
+    args = ('Opel Astra', 'Essence', 'Manuelle', 60_000, 2019)
+    assert predict_price(model, *args, trim='GT Line') == pytest.approx(predict_price(model, *args))
+
+
+def test_the_boosting_accepts_more_families_than_it_has_categories():
+    cars = make_cars_with_trim(600)
+    cars['Finition'] = [f'Family{number}' for number in range(len(cars))]  # 600 families, the limit is 255
+    model = train_final_model(cars, kind='boosting')
+    assert predict_price(model, 'Opel Astra', 'Essence', 'Manuelle', 60_000, 2019, trim='Family3') > 0
 
 
 # ---------------------------------------------------------------- importance

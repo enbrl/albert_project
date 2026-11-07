@@ -7,7 +7,7 @@ Usage (from the root of the project), after training the model with
 
 The power in horsepower is optional (``--power 100``): it makes the estimate more precise when the
 model was trained with it (the power is the column that matters most for the price). For an electric car,
-``--battery 50`` gives the capacity of the battery in kWh, with the same effect.
+``--battery 50`` gives the capacity of the battery in kWh, with the same effect, and ``--trim "Allure Pack"`` the trim.
 
 The labels are cleaned like in scripts/datacleaning.py: 'PEUGEOT 208', 'peugeot 208'
 and 'Peugeot 208' are the same car, and 'Auto.' means 'Automatique'.
@@ -36,6 +36,7 @@ def main(argv=None):
         type=float,
         help='capacity of the battery in kWh (optional, electric cars, used if the model knows it)',
     )
+    parser.add_argument('--trim', help='trim, for example "Allure Pack" (optional, used if the model knows the trims)')
     parser.add_argument('--model', default=DEFAULT_MODEL_PATH, help=f'trained model (default: {DEFAULT_MODEL_PATH})')
     args = parser.parse_args(argv)
 
@@ -79,6 +80,7 @@ def main(argv=None):
         args.year,
         power=args.power,
         battery=args.battery,
+        trim=args.trim,
     )
     print(f'Estimated price: {euros(price)}')
     return price

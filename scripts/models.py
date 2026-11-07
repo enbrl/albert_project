@@ -50,10 +50,13 @@ from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler,
 
 from scripts.cli import UserError, run
 
-CATEGORICAL_FEATURES = ['Marque', 'Nom', 'Carburant', 'Boite de vitesse']
+BASE_CATEGORICAL_FEATURES = ['Marque', 'Nom', 'Carburant', 'Boite de vitesse']
 NUMERIC_FEATURES = ['Km', 'année']
-OPTIONAL_NUMERIC_FEATURES = ['Puissance', 'Batterie']  # used only when the data has it (and enough of it)
-FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
+# Used only when the data has them (and enough of them)
+OPTIONAL_NUMERIC_FEATURES = ['Puissance', 'Batterie']
+OPTIONAL_CATEGORICAL_FEATURES = ['Gamme']  # the family of the trim, made from 'Finition' (see add_trim_family)
+CATEGORICAL_FEATURES = BASE_CATEGORICAL_FEATURES + OPTIONAL_CATEGORICAL_FEATURES
+FEATURES = BASE_CATEGORICAL_FEATURES + NUMERIC_FEATURES
 TARGET = 'Prix'
 
 # The models that can be trained. 'average' only answers the mean price (to compare with).
@@ -74,6 +77,22 @@ ELECTRIC = 'Électrique'
 MIN_ELECTRIC_CARS = 10
 
 
+def add_trim_family(df):
+    """
+    The same cars with the column 'Gamme': the first word of the trim, in small letters ('Allure Pack' -> 'allure').
+
+    The 790 trims of the listing are too many to learn each one, but they come in families (Allure, Allure Pack,
+    Allure Suréquipée...) that say how well the car is equipped. Without 'Finition', the cars are returned unchanged.
+    """
+    if 'Finition' not in df.columns or 'Gamme' in df.columns:
+        return df
+    families = [
+        trim.split()[0].lower() if isinstance(trim, str) and trim.split() else np.nan for trim in df['Finition']
+    ]
+    # object, even when every trim is unknown: a column of NaN only would be read as numbers, not as labels
+    return df.assign(Gamme=pd.Series(families, index=df.index, dtype=object))
+
+
 def is_usable(df, column):
     """Does the data have enough of this optional column to learn from it?"""
     if column not in df.columns:
@@ -86,7 +105,9 @@ def is_usable(df, column):
 
 def feature_columns(df):
     """The columns used by the model for this data: the usual ones, plus the optional ones the data has."""
-    return FEATURES + [column for column in OPTIONAL_NUMERIC_FEATURES if is_usable(df, column)]
+    df = add_trim_family(df)
+    optional = OPTIONAL_NUMERIC_FEATURES + OPTIONAL_CATEGORICAL_FEATURES
+    return FEATURES + [column for column in optional if is_usable(df, column)]
 
 
 def prepare_features(df, columns=None):
@@ -97,7 +118,7 @@ def prepare_features(df, columns=None):
     - df: DataFrame of cars
     - columns: the columns to return (by default: feature_columns(df))
     """
-    features = df.copy()
+    features = add_trim_family(df.copy())
     if 'Marque' not in features.columns:
         features['Marque'] = features['Nom'].astype(str).str.split().str[0]
     columns = columns if columns is not None else feature_columns(features)
@@ -156,6 +177,8 @@ def build_model(kind=DEFAULT_KIND, random_state=42, columns=None):
 
 # The model has too many names to be a category of the boosting: it is replaced by its mean price
 TARGET_ENCODED = ['Nom']
+# The most categories the boosting accepts in one column (the rarer values are grouped in one)
+MAX_CATEGORIES = 255
 
 
 def target_encoder(random_state, version=None):
@@ -176,7 +199,13 @@ def _build_boosting(categorical, numeric, numbers, random_state):
     encoded = [c for c in categorical if c in TARGET_ENCODED]
     labels = [c for c in categorical if c not in TARGET_ENCODED]
     # A label never seen (or missing) becomes -1, which the boosting reads as 'missing'
-    ordinal = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1, encoded_missing_value=-1)
+    # The boosting takes at most 255 categories: the rarest values are grouped (the listing has 251 trim families)
+    ordinal = OrdinalEncoder(
+        handle_unknown='use_encoded_value',
+        unknown_value=-1,
+        encoded_missing_value=-1,
+        max_categories=MAX_CATEGORIES,
+    )
     preprocessing = ColumnTransformer(
         [
             ('labels', ordinal, labels),
@@ -431,7 +460,7 @@ def load_model(filename=DEFAULT_MODEL_PATH):
     return joblib.load(filename)
 
 
-def predict_price(model, name, fuel, gearbox, km, year, power=None, battery=None):
+def predict_price(model, name, fuel, gearbox, km, year, power=None, battery=None, trim=None):
     """
     Estimate the price (in euros) of one used car.
 
@@ -443,6 +472,7 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None, battery=None
     - year: year of the first registration
     - power: power in horsepower; used only if the model was trained with the power (otherwise ignored)
     - battery: capacity of the battery in kWh (electric cars); used only if the model was trained with it
+    - trim: the trim, for example 'Allure Pack' (only its first word counts); used only if the model was trained with it
     """
     car = pd.DataFrame(
         [
@@ -454,6 +484,7 @@ def predict_price(model, name, fuel, gearbox, km, year, power=None, battery=None
                 'année': year,
                 'Puissance': np.nan if power is None else power,
                 'Batterie': np.nan if battery is None else battery,
+                'Finition': trim if trim else np.nan,
             }
         ]
     )

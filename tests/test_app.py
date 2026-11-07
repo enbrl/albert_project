@@ -13,7 +13,7 @@ pytest.importorskip('streamlit', reason='Streamlit is not installed (pip install
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 from scripts.models import save_model, train_final_model  # noqa: E402
-from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power  # noqa: E402
+from tests.test_models import make_cars, make_cars_with_battery, make_cars_with_power, make_cars_with_trim  # noqa: E402
 
 APP = str(Path(__file__).resolve().parent.parent / 'app.py')
 
@@ -31,6 +31,9 @@ def files(tmp_path_factory):
     battery_cars = make_cars_with_battery(450, seed=4)
     battery_cars.to_csv(folder / 'battery_cars.csv', index=False)
     save_model(train_final_model(battery_cars, kind='ridge'), str(folder / 'battery.joblib'))
+    trim_cars = make_cars_with_trim(450, seed=4)
+    trim_cars.to_csv(folder / 'trim_cars.csv', index=False)
+    save_model(train_final_model(trim_cars, kind='ridge'), str(folder / 'trim.joblib'))
     return folder
 
 
@@ -137,6 +140,17 @@ def test_the_battery_changes_the_estimate_of_an_electric_car_when_the_model_know
         return int(app.metric[0].value.replace(' €', '').replace(' ', '').replace(' ', ''))
 
     assert price(100) > price(40) + 1000
+
+
+def test_the_trim_changes_the_estimate_when_the_model_knows_it(files):
+    def price(trim):
+        app = start(files / 'trim.joblib', files / 'trim_cars.csv')
+        app.selectbox[0].set_value('Opel Astra')
+        app.text_input(key='trim').set_value(trim)
+        app.button[0].click().run()
+        return int(app.metric[0].value.replace(' €', '').replace(' ', '').replace(' ', ''))
+
+    assert price('GT Line') > price('Active') * 1.1
 
 
 # ---------------------------------------------------------------- the two languages
