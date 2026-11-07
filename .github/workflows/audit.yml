@@ -1,0 +1,43 @@
+name: Audit the dependencies
+
+# Looks for known vulnerabilities (pip-audit, which reads the PyPI advisory database) in the versions the project allows:
+#  - the oldest ones, constraints-min.txt (what requirements.txt lets somebody install);
+#  - the newest ones, which is what `pip install` gives today.
+# It runs when the requirements change and every Monday: a new advisory can appear without any change in this repository.
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - 'requirements-app.txt'
+      - 'constraints-min.txt'
+      - '.github/workflows/audit.yml'
+  schedule:
+    - cron: '41 5 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      # Two advisories cannot be fixed for Python 3.9, the oldest version we test:
+      #  - PYSEC-2026-2275: requests, fixed in 2.33.0, which needs Python 3.10 or later (newer versions are audited below);
+      #  - PYSEC-2026-1845: pytest, fixed in 9.0.3, which needs Python 3.10 or later (a test tool, not shipped).
+      - name: The oldest versions
+        run: >
+          pip-audit -r constraints-min.txt --no-deps --disable-pip
+          --ignore-vuln PYSEC-2026-2275 --ignore-vuln PYSEC-2026-1845
+
+      - name: The newest versions
+        run: |
+          pip install --upgrade pip
+          pip install numpy pandas scikit-learn matplotlib requests beautifulsoup4 pytest
+          pip-audit

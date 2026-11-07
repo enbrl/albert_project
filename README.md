@@ -141,7 +141,7 @@ pre-commit install
 ```
 Before each commit they check and format the code (`ruff`), remove the results saved in the notebooks (`nbstripout`) and check the files. GitHub runs the same checks on every pull request: code that is not formatted fails it. To format by hand: `pre-commit run --all-files`.
 
-The tests run on GitHub with the oldest packages (`constraints-min.txt`) and the newest ones. If you need an older version of a package than the lower bounds of `requirements.txt`, test it first.
+The tests run on GitHub with the oldest packages (`constraints-min.txt`) and the newest ones. Every Monday, and when the requirements change, `pip-audit` also looks for known vulnerabilities in both sets of versions (`.github/workflows/audit.yml`): that is why the lower bounds of `requests` and `scikit-learn` are not older than they are. If you need an older version of a package than the lower bounds of `requirements.txt`, test it first.
 
 ## Scraping rules
 - The scraper follows the `robots.txt` of aramisauto.com: only the public listing pages, one request every 5 seconds (`Crawl-delay`), a timeout and a `User-Agent` that names the project. It never goes faster than 5 seconds.
